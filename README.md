@@ -2,6 +2,23 @@
 
 **大乱斗 (ARAM / KIWI)** 本地选人助手 + 鹤哥 AI 教练 — 单文件 / 零依赖 / 仅 Windows / 客户端只读。
 
+---
+
+> ## ⚠️ 法律与合规声明 / Legal & Compliance Notice
+>
+> **请在使用前完整阅读 [DISCLAIMER.md](DISCLAIMER.md) 与 [BOUNDARIES.md](BOUNDARIES.md). 下载/使用即视为已知悉并同意全部条款.**
+>
+> - 🚫 **非 Riot Games 官方产品**. 本项目与 Riot Games 无任何隶属、赞助、认可关系. "League of Legends" / "英雄联盟" / "ARAM" 等商标归 Riot Games, Inc. 所有.
+> - 🛡️ **仅通过 LCU 只读访问**. 不发任何写操作 / 不修改客户端 / 不绕过反作弊 / 不替玩家执行任何游戏内操作.
+> - ⚖️ **使用本工具可能违反 Riot 服务条款**. 风险由使用者自担, 作者不承担因封号/限号等导致的任何损失. 如果你的账号特别重要请不要使用.
+> - 🧠 **AI 教练仅提供运动心理学层面的参考建议**. 不是临床心理治疗工具, 不是医疗设备, 不能替代心理咨询师或精神科医生. 出现严重情绪问题请立即拨打专业危机热线 (见 DISCLAIMER §3).
+> - 🔒 **数据完全本地**. `data/` 目录不出本机. 任何对外通信均为可选、用户主动触发, 且已在文档中明列.
+> - 📜 **MIT 协议** ([LICENSE](LICENSE)). 软件按"AS IS"提供, 不附带任何明示或暗示的保证.
+>
+> *English version of all notices is included in [DISCLAIMER.md](DISCLAIMER.md). Both languages are provided; English controls for legal interpretation.*
+
+---
+
 ```
 python rankprobe_lite.py
 # 浏览器打开 http://127.0.0.1:6280/
@@ -300,3 +317,43 @@ FFAN.exe regen-profiles
 | 老 data/ 不兼容 | v1 路径仍读, 新数据走 v2, 不强制迁移 |
 
 更多细节见 [ROADMAP.md](ROADMAP.md) "抗风险" 章节。
+
+---
+
+## 第三方资源与归属 / Third-Party Resources & Attribution
+
+| 资源 | 来源 | 用途 | 许可 |
+|---|---|---|---|
+| 英雄字典 (`champion-summary.json`) | [CommunityDragon](https://www.communitydragon.org/) | 英雄名称/角色映射 | Riot 官方静态资源镜像, 公开 |
+| KIWI augment 字典 | [CommunityDragon](https://www.communitydragon.org/) | 海克斯英文/中文翻译 | 同上 |
+| 海克斯推荐快照 (`apexlol_data.json`) | [apexlol.info](https://apexlol.info) | 海克斯组合社区数据 | 第三方公开页面解析快照, 仅本地离线参考 |
+
+**心理学知识库引用** (见 `bundle_defaults/coach/kb/psychology/*` 各条 `evidence` 字段):
+Tendler · Dweck · Beck · Burns · Ericsson · Csikszentmihalyi · Steinberg 等公开学术作品的**概念性转述与电竞场景应用**, 不复制原文. 完整清单见 [DISCLAIMER.md §6](DISCLAIMER.md).
+
+---
+
+## Riot Games 法律声明 / Riot Legal Jibber Jabber
+
+**中文**:
+FFAN 不是 Riot Games 官方产品, 也未获得 Riot Games 认可. Riot Games, 以及所有相关属性, 均为 Riot Games, Inc. 的商标或注册商标. 英雄联盟 © Riot Games, Inc.
+
+**English**:
+FFAN isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties, are trademarks or registered trademarks of Riot Games, Inc.
+
+---
+
+## 报告问题 / Reporting Issues
+
+- 一般 bug / 功能反馈: [GitHub Issues](https://github.com/hereshouye/FFAN/issues) (请使用对应模板)
+- 安全漏洞 / 隐私问题 / 心理学 KB 错误: 请使用 **GitHub Security Advisory** 私下报告, 不要直接发 Issue
+- 严重危机 (自伤念头、严重抑郁): 请**立即**拨打专业热线, 不要等待软件回应
+  - 北京心理危机研究与干预中心: **010-82951332** / 800-810-1117 (24h)
+  - 希望 24 热线: **400-161-9995** (24h)
+  - 国际: https://www.iasp.info/resources/Crisis_Centres/
+
+---
+
+## 许可 / License
+
+[MIT](LICENSE). Copyright (c) 2026 FFAN contributors. Software provided AS IS, without warranty of any kind.

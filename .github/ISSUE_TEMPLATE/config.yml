@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 心理危机 (CN)
+    url: https://www.who.int/zh/news-room/fact-sheets/detail/suicide
+    about: 自伤/严重抑郁请立即拨打 北京 010-82951332 或 希望 24 热线 400-161-9995. 不要等待软件回应.
+  - name: International Crisis Lines
+    url: https://www.iasp.info/resources/Crisis_Centres/
+    about: If you are in crisis, please contact a local crisis line. Do not wait for software response.
+  - name: 安全漏洞 / 隐私问题
+    url: https://github.com/hereshouye/FFAN/security/advisories/new
+    about: Security & privacy issues — use private advisory, not public issue.
+  - name: 阅读免责声明
+    url: https://github.com/hereshouye/FFAN/blob/main/DISCLAIMER.md
+    about: 提交任何 issue 前请先阅读 DISCLAIMER.md

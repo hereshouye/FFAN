@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FFAN</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<link rel="stylesheet" href="/static/styles.css">
+</head><body>
+
+<div class="top">
+  <span class="dot" id="dot"></span>
+  <span class="status" id="status">等待客户端...</span>
+  <span class="spacer"></span>
+  <button class="btn" id="btn-refresh" title="更新本地缓存字典">
+    <svg class="cloud" width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+    </svg>
+    <span id="btn-refresh-txt">更新数据</span>
+  </button>
+</div>
+
+<main id="root">
+  <div class="empty" id="empty">
+    <div class="icon">🎮</div>
+    <div>未检测到英雄联盟客户端</div>
+    <div class="hint">启动客户端后, 此处会自动显示选人面板</div>
+    <div class="hint">底部搜索框可查询英雄海克斯推荐 / 海克斯说明</div>
+  </div>
+
+  <div id="cs-view" style="display:none">
+    <div class="recap-banner" id="recap-banner">
+      <span class="tag">复盘</span>
+      <span id="recap-text">展示上一局选人, 等待下一次选人...</span>
+      <span class="ago" id="recap-ago">—</span>
+    </div>
+    <div class="card me-card" style="margin-bottom:12px">
+      <h3>我</h3>
+      <div class="me">
+        <div class="av"><img id="me-icon" src=""></div>
+        <div>
+          <div class="name" id="me-name">—</div>
+          <div class="tier" id="me-tier">—</div>
+        </div>
+        <div class="pick">
+          <div class="pick-ic" id="me-pick-ic"><img id="me-pick-img" src="" alt=""></div>
+          <div class="pick-meta">
+            <div class="ch" id="me-pick">—</div>
+            <div class="wr" id="me-pick-wr">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI 教练发言 -->
+    <div class="card coach-card" id="coach-card" style="display:none;margin-bottom:12px">
+      <h3>🎙️ AI 教练点评</h3>
+      <div class="coach-head">
+        <span class="coach-name" id="coach-name">—</span>
+        <span class="coach-tag" id="coach-tag">—</span>
+      </div>
+      <div class="coach-voice" id="coach-voice">—</div>
+      <div class="coach-psych" id="coach-psych"></div>
+      <div class="coach-feedback" id="coach-feedback">
+        <button class="fb-btn" id="coach-fb-up"   title="点赞这句">👍</button>
+        <button class="fb-btn" id="coach-fb-down" title="点踩这句">👎</button>
+        <button class="fb-btn" id="coach-fb-edit" title="改写这句 (训练偏好数据)">✏️ 改写</button>
+        <label class="fb-contrib" title="勾选后, 这条反馈会另存一份脱敏副本到 data/contributed/, 你可一键导出后手动发给作者帮助训练. 不勾就只本地记录, 不会离开你的电脑.">
+          <input type="checkbox" id="coach-fb-contrib"> 贡献到训练集
+        </label>
+        <span class="fb-status" id="coach-fb-status"></span>
+      </div>
+    </div>
+
+    <div class="grid two">
+      <div class="card">
+        <h3>队友 (点击编辑画像)</h3>
+        <div class="mates" id="mates"></div>
+      </div>
+      <div class="card">
+        <h3>AI 阵容架构</h3>
+        <div class="arch-stats" id="arch-stats"></div>
+        <div class="arch-verdict" id="arch-verdict">—</div>
+        <div class="arch-core" id="arch-core"></div>
+        <div class="arch-warn" id="arch-warn"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <h3>海克斯推荐 (我的当前英雄)</h3>
+      <div class="hex-list" id="hex-list"><div class="muted">等待选定英雄...</div></div>
+    </div>
+  </div>
+</main>
+
+<button class="debug-tab" id="debug-tab">调试 ▲</button>
+<div class="debug" id="debug"></div>
+
+<!-- 编辑画像模态框 -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal" id="modal">
+    <h2 id="modal-title">—</h2>
+    <div class="sub" id="modal-sub">点击 [✗] 或框外关闭</div>
+
+    <div class="modal-section">
+      <div class="lbl">当前 persona</div>
+      <div class="modal-current" id="modal-current">
+        <div class="empty">暂无画像</div>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <div class="lbl">添加内容</div>
+      <div class="modal-kind">
+        <label><input type="radio" name="kind" value="peer" checked> 他人评价 (追加)</label>
+        <label><input type="radio" name="kind" value="self"> 第一人称自评 (覆盖)</label>
+      </div>
+      <textarea id="modal-text" placeholder="写点 TA 的人设 / 评价 / 习惯 / 任何自然语言. 自动存到 data/profiles.json, 后期 AI 训练用..."></textarea>
+      <div class="modal-hint">提示: Cmd/Ctrl+Enter 也能保存</div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" id="modal-cancel">取消</button>
+      <button class="btn primary" id="modal-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="search-results" id="sr"></div>
+<div class="search">
+  <input id="q" type="text" autocomplete="off"
+    placeholder="搜索英雄 / 海克斯名称..." />
+</div>
+
+<!-- 训练贡献 (opt-in, 默认折叠) -->
+<button class="contrib-tab" id="contrib-tab" title="贡献到训练集"
+  >💝 贡献 <span id="contrib-tab-n">0</span></button>
+<div class="contrib-panel" id="contrib-panel">
+  <div class="contrib-head">
+    <b>训练贡献</b>
+    <button class="contrib-x" id="contrib-close" title="关闭">✕</button>
+  </div>
+  <div class="contrib-body">
+    <div class="contrib-row">
+      <span class="contrib-lbl">待贡献样本</span>
+      <span class="contrib-val" id="contrib-count">0</span>
+    </div>
+    <div class="contrib-row">
+      <span class="contrib-lbl">匿名 ID</span>
+      <span class="contrib-val mono" id="contrib-anon">—</span>
+    </div>
+    <div class="contrib-row">
+      <span class="contrib-lbl">同意状态</span>
+      <span class="contrib-val" id="contrib-consent">未声明</span>
+    </div>
+    <div class="contrib-hint" id="contrib-hint">
+      勾选教练点评下的 "贡献到训练集" → 这里累积样本 → 一键导出 JSON →
+      手动发给作者 (GitHub Issue 或邮件). 你随时可清空或撤回同意.
+    </div>
+    <div class="contrib-actions">
+      <button class="btn" id="contrib-export">导出 JSON</button>
+      <button class="btn" id="contrib-upload">打开上传地址</button>
+      <button class="btn" id="contrib-revoke" title="撤回同意, 之后即使勾选也不写副本">撤回同意</button>
+      <button class="btn warn" id="contrib-clear" title="清空已积累的待贡献样本">清空</button>
+    </div>
+    <div class="contrib-target" id="contrib-target"></div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body></html>

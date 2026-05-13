@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="zh"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FFAN — 系统介绍 · 数据架构 · 未来规划</title>
+<style>
+  :root {
+    --bg:       #0d0f14;
+    --bg-card:  #161922;
+    --bg-soft:  #1c2030;
+    --txt:      #e5e8ef;
+    --dim:      #8b91a3;
+    --pri:      #b39dff;   /* 紫 */
+    --teal:     #48d1d1;   /* 青绿 */
+    --phi:      #f0c75e;   /* 金 */
+    --rose:     #ff6b8a;   /* 粉 */
+    --orange:   #ff8a4d;
+    --green:    #36e8a8;
+    --red:      #ff5a5a;
+    --border:   rgba(255,255,255,.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg); color: var(--txt);
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", Segoe UI, sans-serif;
+    font-size: 14px; line-height: 1.7;
+  }
+  body { padding: 0 20px 80px; }
+
+  /* ==== Layout ==== */
+  .wrap { max-width: 980px; margin: 0 auto; }
+
+  /* ==== Hero ==== */
+  .hero {
+    padding: 60px 0 30px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+  .hero .badge {
+    display: inline-block; padding: 4px 12px;
+    background: rgba(72,209,209,.1); color: var(--teal);
+    border-radius: 12px; font-size: 12px; letter-spacing: 1px;
+    margin-bottom: 14px;
+  }
+  .hero h1 {
+    font-size: 38px; line-height: 1.2; margin-bottom: 14px;
+    background: linear-gradient(120deg, var(--pri), var(--teal));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; color: transparent;
+  }
+  .hero .tagline {
+    font-size: 17px; color: var(--dim); max-width: 620px; margin: 0 auto 18px;
+  }
+  .hero .meta {
+    color: var(--dim); font-size: 12px;
+  }
+
+  /* ==== Section ==== */
+  section {
+    margin: 56px 0;
+  }
+  section h2 {
+    font-size: 22px; margin-bottom: 20px; padding-left: 12px;
+    border-left: 4px solid var(--pri); line-height: 1.4;
+  }
+  section h2 small {
+    display: block; font-size: 12px; color: var(--dim);
+    font-weight: 400; margin-top: 4px;
+  }
+  section p {
+    margin-bottom: 14px; color: var(--txt);
+  }
+  section p.muted { color: var(--dim); font-size: 13px; }
+
+  /* ==== Cards ==== */
+  .card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px; margin-bottom: 14px;
+  }
+  .card h3 {
+    font-size: 16px; margin-bottom: 10px; color: var(--phi);
+  }
+  .card h3 .num {
+    display: inline-block; width: 24px; height: 24px; line-height: 24px;
+    background: var(--phi); color: var(--bg); text-align: center;
+    border-radius: 50%; font-size: 12px; margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 800px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  }
+
+  /* ==== Roles ==== */
+  .role-card {
+    padding: 20px; border-radius: 10px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-top: 3px solid var(--pri);
+  }
+  .role-card.psych { border-top-color: var(--rose); }
+  .role-card.caster { border-top-color: var(--teal); }
+  .role-card h3 { color: var(--txt); font-size: 17px; margin-bottom: 8px; }
+  .role-card .icon { font-size: 28px; margin-bottom: 6px; }
+  .role-card .what { color: var(--dim); font-size: 12px; margin-bottom: 12px; line-height: 1.5; }
+  .role-card ul { list-style: none; }
+  .role-card li {
+    font-size: 12px; color: var(--txt); padding: 3px 0;
+    padding-left: 14px; position: relative;
+  }
+  .role-card li::before {
+    content: "—"; position: absolute; left: 0; color: var(--dim);
+  }
+
+  /* ==== Data architecture tree ==== */
+  pre.tree {
+    background: var(--bg-soft); color: var(--txt);
+    padding: 18px; border-radius: 8px; font-size: 12px;
+    line-height: 1.6; overflow-x: auto;
+    border: 1px solid var(--border);
+    font-family: "Cascadia Code", "Consolas", "SF Mono", monospace;
+  }
+  pre.tree .c { color: var(--dim); }       /* 注释 */
+  pre.tree .v { color: var(--teal); }      /* v2 新增 */
+  pre.tree .l { color: var(--phi); }       /* legacy */
+  pre.tree .k { color: var(--rose); }      /* 关键 */
+
+  /* ==== Table ==== */
+  table {
+    width: 100%; border-collapse: collapse;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden;
+  }
+  th, td {
+    padding: 10px 14px; text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  th { background: var(--bg-soft); color: var(--phi); font-weight: 600; }
+  td { color: var(--txt); vertical-align: top; }
+  td.dim { color: var(--dim); }
+  td .ok { color: var(--green); }
+  td .no { color: var(--red); }
+  td .warn { color: var(--orange); }
+  tr:last-child td { border-bottom: none; }
+
+  /* ==== Pipeline ==== */
+  .pipeline {
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 18px; background: var(--bg-soft); border-radius: 8px;
+    border: 1px solid var(--border);
+    font-family: "Cascadia Code", "Consolas", monospace; font-size: 12px;
+  }
+  .pipeline .step {
+    padding: 8px 12px; background: var(--bg-card); border-radius: 6px;
+    border-left: 3px solid var(--pri); color: var(--txt);
+  }
+  .pipeline .arrow { color: var(--dim); text-align: center; font-size: 14px; }
+  .pipeline .step strong { color: var(--phi); }
+
+  /* ==== Sprint cards (roadmap) ==== */
+  .sprint {
+    background: var(--bg-card); border-radius: 10px; padding: 16px 18px;
+    margin-bottom: 12px; border: 1px solid var(--border);
+    display: grid; grid-template-columns: 80px 1fr auto; gap: 16px; align-items: start;
+  }
+  .sprint.done { border-left: 4px solid var(--green); }
+  .sprint.now  { border-left: 4px solid var(--phi); }
+  .sprint.next { border-left: 4px solid var(--pri); }
+  .sprint.later { border-left: 4px solid var(--dim); }
+  .sprint .tag {
+    font-size: 11px; color: var(--dim); text-align: center;
+    border: 1px solid var(--border); padding: 3px 0; border-radius: 4px;
+    height: 22px;
+  }
+  .sprint.done .tag { color: var(--green); border-color: var(--green); }
+  .sprint.now  .tag { color: var(--phi);  border-color: var(--phi); }
+  .sprint.next .tag { color: var(--pri);  border-color: var(--pri); }
+  .sprint .name { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .sprint .desc { color: var(--dim); font-size: 12px; }
+  .sprint .eta { font-size: 11px; color: var(--dim); font-family: monospace; }
+
+  /* ==== Boundary section ==== */
+  .boundary {
+    background: linear-gradient(135deg, rgba(255,90,90,.06), rgba(255,138,77,.04));
+    border: 1px solid rgba(255,90,90,.2); border-radius: 10px;
+    padding: 20px; margin-bottom: 14px;
+  }
+  .boundary h3 { color: var(--red); }
+  .boundary .h3-soft { color: var(--orange); }
+
+  /* ==== Code inline ==== */
+  code {
+    background: var(--bg-soft); color: var(--teal);
+    padding: 2px 6px; border-radius: 3px; font-size: 12px;
+    font-family: "Cascadia Code", "Consolas", monospace;
+  }
+  a { color: var(--teal); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ==== Nav (right side floating) ==== */
+  nav.toc {
+    position: fixed; right: 20px; top: 80px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 14px;
+    font-size: 12px; max-width: 180px;
+  }
+  nav.toc .h { color: var(--phi); font-size: 11px; margin-bottom: 8px; letter-spacing: 1px; }
+  nav.toc a {
+    display: block; padding: 3px 0; color: var(--dim);
+  }
+  nav.toc a:hover { color: var(--teal); text-decoration: none; }
+  @media (max-width: 1280px) { nav.toc { display: none; } }
+
+  /* ==== Footer ==== */
+  footer {
+    margin-top: 80px; padding: 30px 0; border-top: 1px solid var(--border);
+    text-align: center; color: var(--dim); font-size: 12px;
+  }
+  footer a { margin: 0 10px; }
+
+  /* ==== Hero stats ==== */
+  .stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    margin-top: 30px;
+  }
+  .stat {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; text-align: center;
+  }
+  .stat .num {
+    font-size: 28px; color: var(--teal); font-weight: 700;
+    font-family: "Cascadia Code", monospace;
+  }
+  .stat .label { font-size: 11px; color: var(--dim); margin-top: 4px; }
+
+  /* ==== Capability cards ==== */
+  .cap {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px;
+  }
+  .cap .icon-row {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+  }
+  .cap .ic {
+    width: 36px; height: 36px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+  }
+  .cap.psy   .ic { background: rgba(255,107,138,.15); color: var(--rose); }
+  .cap.data  .ic { background: rgba(72,209,209,.15); color: var(--teal); }
+  .cap.voice .ic { background: rgba(179,157,255,.15); color: var(--pri); }
+  .cap.kb    .ic { background: rgba(240,199,94,.15);  color: var(--phi); }
+  .cap h3 { color: var(--txt); font-size: 16px; }
+  .cap .what { color: var(--dim); font-size: 12px; margin-top: 8px; line-height: 1.6; }
+  .cap .tools {
+    margin-top: 12px; padding-top: 10px;
+    border-top: 1px dashed var(--border); font-size: 11px; color: var(--dim);
+  }
+</style>
+</head><body>
+
+<nav class="toc">
+  <div class="h">目录</div>
+  <a href="#define">是什么</a>
+  <a href="#cap">4 大能力</a>
+  <a href="#roles">3 角色</a>
+  <a href="#arch">数据架构</a>
+  <a href="#kb">心理学 KB</a>
+  <a href="#loop">训练闭环</a>
+  <a href="#contribute">训练贡献</a>
+  <a href="#resilience">抗风险</a>
+  <a href="#roadmap">未来规划</a>
+  <a href="#boundary">边界硬约束</a>
+</nav>
+
+<div class="wrap">
+
+  <!-- ==== HERO ==== -->
+  <div class="hero">
+    <div class="badge">v2 · 2026-05</div>
+    <h1>FFAN</h1>
+    <p class="tagline">大乱斗本地选人助手 · 鹤哥 AI 教练 · 长期心理画像跟踪</p>
+    <p class="meta">单文件 / 零依赖 / 仅 Windows / 客户端只读 / 数据本地</p>
+
+    <div class="stats">
+      <div class="stat"><div class="num">38</div><div class="label">心理学 KB 条目</div></div>
+      <div class="stat"><div class="num">5</div><div class="label">心理画像维度</div></div>
+      <div class="stat"><div class="num">3</div><div class="label">AI 角色</div></div>
+      <div class="stat"><div class="num">100%</div><div class="label">数据本地</div></div>
+    </div>
+  </div>
+
+  <!-- ==== Section: Define ==== -->
+  <section id="define">
+    <h2>是什么 / 不是什么 <small>清晰边界, 不过度承诺</small></h2>
+
+    <div class="grid-2">
+      <div class="card" style="border-left:3px solid var(--green)">
+        <h3>✅ 是</h3>
+        <ul style="list-style:none; padding:0">
+          <li style="padding:4px 0">个性化 LoL ARAM 选人助手</li>
+          <li style="padding:4px 0">长期心理画像跟踪 (情绪曲线 / tilt 监控)</li>
+          <li style="padding:4px 0">AI 教练训练底座 (history + feedback 闭环)</li>
+          <li style="padding:4px 0">本地数据, 隐私第一</li>
+          <li style="padding:4px 0">可演化 — KB / 模型底座可切换</li>
+        </ul>
+      </div>
+
+      <div class="card" style="border-left:3px solid var(--red)">
+        <h3>❌ 不是</h3>
+        <ul style="list-style:none; padding:0">
+          <li style="padding:4px 0">op.gg / blitz 替代品 (我们不做全局 stats 聚合)</li>
+          <li style="padding:4px 0">真人教练替代品 (深度心理问题 → 真人/热线)</li>
+          <li style="padding:4px 0">心理治疗工具 (仅运动心理学边界)</li>
+          <li style="padding:4px 0">上分神器 / 一周上钻</li>
+          <li style="padding:4px 0">作弊工具 (LCU 只读, 不替代人操作)</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==== Section: 4 Capabilities ==== -->
+  <section id="cap">
+    <h2>4 大能力维度 <small>对应运动心理学 + CBT + 成长型思维 + LoL 专业知识</small></h2>
+
+    <div class="grid-2">
+      <div class="cap psy">
+        <div class="icon-row">
+          <div class="ic">🧠</div>
+          <h3>① 心理专家</h3>
+        </div>
+        <div class="what">
+          画像 + 安抚情绪 + diss 有问题的点 + 专项训练指导. 基于 Tendler tilt 框架 + CBT + Dweck 成长型思维 + 青春期发展心理学.
+        </div>
+        <div class="tools">
+          KB: tilt_types (7) · adolescent_traps (6) · cbt_techniques (8) · growth_mindset (8)
+        </div>
+      </div>
+
+      <div class="cap data">
+        <div class="icon-row">
+          <div class="ic">📊</div>
+          <h3>② 数据整理 + 复盘</h3>
+        </div>
+        <div class="what">
+          专业准确的对局复盘 + 团队架构报告. 4 种复盘协议 (3-2-1 / WWW / KPT / PIE), 按 motivation_type 推荐.
+        </div>
+        <div class="tools">
+          KB: debrief_protocols · 完整 normalized 数据 · psych_state 滚动
+        </div>
+      </div>
+
+      <div class="cap voice">
+        <div class="icon-row">
+          <div class="ic">🎙️</div>
+          <h3>③ 人设 + 真人语气</h3>
+        </div>
+        <div class="what">
+          自然语言人设 + 真人评价 + 可手填. 自评 (self_voice) + 他评 (peer_voices) 作为训练语料根, 训练成你的专属语气模型.
+        </div>
+        <div class="tools">
+          profile.persona · coach/persona.json · 用户改写反馈 (DPO 偏好对)
+        </div>
+      </div>
+
+      <div class="cap kb">
+        <div class="icon-row">
+          <div class="ic">📚</div>
+          <h3>④ LoL 专业知识</h3>
+        </div>
+        <div class="what">
+          英雄 / 装备 / 符文 / 海克斯 / 连招 / 强势期. 走 CommunityDragon 官方导出, 不爬第三方.
+        </div>
+        <div class="tools">
+          assets/champion-summary · KIWI augments · apexlol 推荐 · kb/champions_meta (规划)
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==== Section: 3 Roles ==== -->
+  <section id="roles">
+    <h2>3 个 AI 角色 — 同一个实例, 显式切换 <small>职业体育里这是 3 个真人, 业余玩家用 1 个 AI 三合一</small></h2>
+
+    <p>每个角色有不同语气和能力边界. UI 显式切换, 不让用户混淆现在听谁说话.</p>
+
+    <div class="grid-3">
+      <div class="role-card">
+        <div class="icon">🧭</div>
+        <h3>教练 Coach</h3>
+        <div class="what">选人前 · 战术建议 · 阵容评估. 主动, 可推可拉, 偶尔毒舌.</div>
+        <ul>
+          <li>本局指挥棒交给谁</li>
+          <li>阵容架构警告 (无前排/AD 过载)</li>
+          <li>战术节奏建议</li>
+        </ul>
+      </div>
+
+      <div class="role-card psych">
+        <div class="icon">💗</div>
+        <h3>心理专家 Psych</h3>
+        <div class="what">tilt 干预 · 连败后 · 安慰. 温柔, 关注情绪不批评行为.</div>
+        <ul>
+          <li>识别上头 / 倦怠</li>
+          <li>CBT 重构句式</li>
+          <li>呼吸法 / 行为激活</li>
+          <li>危机识别 (硬约束)</li>
+        </ul>
+      </div>
+
+      <div class="role-card caster">
+        <div class="icon">📺</div>
+        <h3>解说 Caster</h3>
+        <div class="what">局后复盘 · 周报 · 数据对比. 客观用数字说话, 不带情绪.</div>
+        <ul>
+          <li>3-2-1 / KPT 复盘</li>
+          <li>30 天 vs alltime 对比</li>
+          <li>成长曲线展示</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==== Section: Data Architecture ==== -->
+  <section id="arch">
+    <h2>数据架构 v2 <small>四类分离: 资源 / 画像 / 事实 / 产出</small></h2>
+
+    <p>按事务分目录, 不按时间. 每类数据有清晰的归宿, 不混在同一个 <code>_cache/</code> 黑洞里.</p>
+
+<pre class="tree">data/
+├── _VERSION                                <span class="c">← 布局版本 = 2</span>
+├── profiles.json                           <span class="c">← 玩家画像 (manual + persona + psych + auto)</span>
+│
+├── <span class="v">coach/</span>                                <span class="c">← AI 教练命脉 ★</span>
+│   ├── persona.json                        <span class="c">人设</span>
+│   ├── <span class="k">history.jsonl</span>                        <span class="c">每次发言 (SFT 训练源)</span>
+│   ├── <span class="k">feedback.jsonl</span>                       <span class="c">用户 👍/👎/✏️ (DPO 偏好对)</span>
+│   └── kb/psychology/                      <span class="c">心理学 KB (38 条)</span>
+│       ├── _index.json
+│       ├── profile_axes.json               <span class="c">5 维画像词典</span>
+│       ├── tilt_types.jsonl                <span class="c">7 类 tilt</span>
+│       ├── adolescent_traps.jsonl          <span class="c">6 类青春期陷阱</span>
+│       ├── cbt_techniques.jsonl            <span class="c">8 个 CBT 技巧</span>
+│       ├── growth_mindset.jsonl            <span class="c">8 个 reframe</span>
+│       ├── arousal_regulation.jsonl        <span class="c">唤醒调节</span>
+│       ├── stress_inoculation.jsonl        <span class="c">压力训练</span>
+│       ├── <span class="k">crisis_signals.md</span>                <span class="c">🔴 危机识别 (硬约束)</span>
+│       ├── communication_protocols.md
+│       └── debrief_protocols.md
+│
+├── <span class="v">me/</span>                                   <span class="c">← 我自己长期状态</span>
+│   ├── summoner.json
+│   ├── ranked_stats.json
+│   ├── ranked_timeline.jsonl               <span class="c">每日段位 (情绪曲线根)</span>
+│   ├── friends.json                        <span class="c">社交图谱</span>
+│   └── honor_profile.json
+│
+├── <span class="v">games/</span>                                <span class="c">← 每局一文件夹</span>
+│   ├── _index.jsonl                        <span class="c">全局索引</span>
+│   └── &lt;gid&gt;/
+│       ├── detail.json                     <span class="c">raw LCU detail</span>
+│       ├── timeline.json.gz                <span class="c">raw timeline (gzip 10x)</span>
+│       ├── normalized.json                 <span class="c">单局聚合</span>
+│       └── champ_select.json
+│
+├── <span class="v">players/</span>                              <span class="c">← 玩家长期状态</span>
+│   └── &lt;puuid&gt;/
+│       ├── summoner.json
+│       ├── ranked.json
+│       ├── <span class="k">psych_state.json</span>                 <span class="c">动态心理状态 (form/streak/tilt)</span>
+│       └── <span class="k">psych_timeline.jsonl</span>             <span class="c">变化追加 (持续成长监控)</span>
+│
+└── <span class="l">_cache/</span>                               <span class="c">← v1 兼容 (assets 还活着)</span>
+    ├── assets/                             <span class="c">英雄/KIWI 字典</span>
+    ├── hex_recommendations/                <span class="c">apexlol 海克斯推荐</span>
+    └── normalized/                         <span class="c">regen-profiles 还在读</span></pre>
+
+    <h3 style="margin-top:24px;color:var(--phi);font-size:14px">四类分离 — 哪些会增长, 增长得多快</h3>
+    <table>
+      <tr><th>类别</th><th>位置</th><th>增长速度</th><th>触发</th></tr>
+      <tr><td><strong>资源</strong> 字典/知识库</td><td><code>_cache/assets/</code> <code>coach/kb/</code></td><td>静态</td><td>「更新数据」/ patch 变化</td></tr>
+      <tr><td><strong>画像</strong> 谁是谁</td><td><code>profiles.json</code> <code>players/&lt;puuid&gt;/</code></td><td>慢 (按人)</td><td>选人/局后 + 手填</td></tr>
+      <tr><td><strong>事实</strong> 对局原始</td><td><code>games/&lt;gid&gt;/</code></td><td>线性 (按对局)</td><td>每场局后</td></tr>
+      <tr><td><strong>产出</strong> 教练发言/反馈</td><td><code>coach/history.jsonl</code> <code>coach/feedback.jsonl</code></td><td>按使用</td><td>每次选人 + 用户按按钮</td></tr>
+    </table>
+  </section>
+
+  <!-- ==== Section: Psych KB ==== -->
+  <section id="kb">
+    <h2>心理学 KB — 38 条干预条目 <small>通用 JSON 格式, 任何 AI 底座 (Claude / GPT / Qwen / 本地 LLM) 都能消费</small></h2>
+
+    <p>每条 KB 是结构化 JSON, 有 trigger (匹配条件) + intervention (干预模板) + evidence (学术出处) + do/dont 约束.</p>
+
+    <div class="grid-4">
+      <div class="card"><h3><span class="num">7</span>tilt</h3><p class="muted" style="font-size:11px">Tendler 扑克 tilt 框架, running_bad / injustice / hate_losing / mistake / entitlement / revenge / desperation</p></div>
+      <div class="card"><h3><span class="num">6</span>青春期</h3><p class="muted" style="font-size:11px">T1-T6: 自我效能脆弱 / 同伴比较 / 冲动控制 / 完美主义 / 失败容忍低 / 社交焦虑</p></div>
+      <div class="card"><h3><span class="num">8</span>CBT</h3><p class="muted" style="font-size:11px">思维记录 / 3 种认知扭曲 / reframe / 4-7-8 呼吸 / 行为激活</p></div>
+      <div class="card"><h3><span class="num">8</span>成长型</h3><p class="muted" style="font-size:11px">Dweck reframe 模板, yet / 夸过程 / 失败是数据 / 比较自我</p></div>
+      <div class="card"><h3><span class="num">5</span>唤醒</h3><p class="muted" style="font-size:11px">倒 U 理论 + 上调/下调 + 赛前 ritual + cue word</p></div>
+      <div class="card"><h3><span class="num">4</span>压力训练</h3><p class="muted" style="font-size:11px">SIT 3 阶段 + 阶梯训练 + 刻意练习 + 恢复</p></div>
+      <div class="card" style="border-left:3px solid var(--red)"><h3 style="color:var(--red)">🔴</h3><p class="muted" style="font-size:11px">crisis_signals.md — 危机识别 (L3/L2/L1) + 国内热线列表</p></div>
+      <div class="card"><h3>📝</h3><p class="muted" style="font-size:11px">communication + debrief protocols (.md) — 沟通分级 + 4 种复盘</p></div>
+    </div>
+
+    <h3 style="margin-top:24px;color:var(--phi);font-size:14px">5 维玩家画像 axes</h3>
+    <table>
+      <tr><th>维度</th><th>4 个取值</th></tr>
+      <tr><td>competitive_style</td><td class="dim">攻击型 / 控制型 / 防守型 / 适应型</td></tr>
+      <tr><td>comm_style</td><td class="dim">指挥型 / 跟随型 / 独立型 / 协作型</td></tr>
+      <tr><td>pressure_response</td><td class="dim">冷血 / 高峰 / 崩盘 / 累积</td></tr>
+      <tr><td>motivation_type</td><td class="dim">胜利 / 表现 / 社交 / 进步</td></tr>
+      <tr><td>tilt_profile</td><td class="dim">易燃 / 慢热 / 钝感 / 自调节</td></tr>
+    </table>
+    <p class="muted" style="margin-top:8px">共 4<sup>5</sup> = 1024 种组合, 每个玩家用 5 元组表达. AI 推断 + 人工审核.</p>
+  </section>
+
+  <!-- ==== Section: Training Loop ==== -->
+  <section id="loop">
+    <h2>AI 教练训练数据闭环 <small>实时收集, 离线训练 — 训练是慢工, 实时来不及</small></h2>
+
+    <div class="pipeline">
+      <div class="step"><strong>1. 实时</strong> 选人 happens → coach_build() 生成 voice (KB 模板版)</div>
+      <div class="arrow">↓</div>
+      <div class="step"><strong>2. 实时</strong> 自动 append → <code>data/coach/history.jsonl</code> (含 mates_psych ctx)</div>
+      <div class="arrow">↓</div>
+      <div class="step"><strong>3. 实时</strong> 用户点 👍/👎/✏️ → <code>data/coach/feedback.jsonl</code></div>
+      <div class="arrow">↓  (周期性, 离线)</div>
+      <div class="step"><strong>4. 离线</strong> <code>build_training_set.py</code> 读 history + feedback + KB + profiles → 组装 chat 格式</div>
+      <div class="arrow">↓</div>
+      <div class="step"><strong>5. 离线</strong> SFT (1000+ 样本) → 微调 Qwen2.5-7B / Llama-3-8B (LoRA)</div>
+      <div class="arrow">↓</div>
+      <div class="step"><strong>6. 离线</strong> 攒到 5000+ 偏好对 → DPO 优化</div>
+      <div class="arrow">↓</div>
+      <div class="step"><strong>7. 部署</strong> 新模型替换 runtime 模板 → 数据继续闭环</div>
+    </div>
+
+    <p class="muted" style="margin-top:14px">每行 history 自带 <code>_v</code> (schema 版本) / <code>_ts</code> / <code>_patch</code> (游戏版本) tag, 训练时按 patch 切片, 避免 balance 改动污染.</p>
+  </section>
+
+  <!-- ==== Section: Contribute (opt-in 训练贡献) ==== -->
+  <section id="contribute">
+    <h2>训练贡献 (opt-in) <small>你愿意, 它才会离开你的电脑. 一个反馈帮训练一万次的模型成长</small></h2>
+
+    <p>上面的"训练闭环"全部跑在你的电脑里 — feedback.jsonl 永远本地. 但单台电脑积累 1000 条样本要打半年; 而 LoRA 微调需要 1000-5000 条才能跑出像样的鹤哥. 所以我们设计了一个 <strong>opt-in 贡献通道</strong>: 你勾选某条反馈"贡献到训练集" → 一份脱敏副本写到 <code>data/contributed/</code> → 你随时一键导出 JSON 手动发给作者 (GitHub Issue / 邮件). <strong>没勾就什么都不会离开</strong>.</p>
+
+    <h3 style="margin-top:20px;font-size:16px;color:var(--phi)">为什么 "千人千面" 是优势, 不是噪声</h3>
+    <p>直觉会想: 每个用户的鹤哥都不一样 (有人爱温和, 有人爱毒舌), 把所有人数据混在一起训出来不就是个平均怪? 不是. 现代 instruct 模型学的是 <em>条件函数</em>:</p>
+    <pre style="background:var(--bg-soft);padding:14px;border-radius:8px;color:var(--teal);font-family:Consolas,monospace;font-size:12px;overflow:auto">f(玩家画像, 局势上下文, 教练人设) → 回复</pre>
+    <p>1000 个用户 = 1000 组不同条件下的"好回复"标签. 模型学到的是: <strong>面对什么样的玩家 × 什么场景 × 什么人设 → 该怎么说</strong>. 输入变, 输出变. 这就是 ChatGPT 同一个模型能既辅导小学生又陪博士讨论拓扑的原理.</p>
+
+    <h3 style="margin-top:24px;font-size:16px;color:var(--phi)">收集什么 · 不收集什么</h3>
+    <div class="grid-2">
+      <div class="card" style="border-left:3px solid var(--teal)">
+        <strong style="color:var(--teal)">✓ 会收 (蒸馏必需)</strong>
+        <ul style="margin-top:8px;padding-left:18px;color:var(--txt);font-size:13px;line-height:1.9">
+          <li>玩家 5 轴心理画像 (上头/自我批评/求胜欲/团队感/学习意愿)</li>
+          <li>当前 tilt / mood / 连胜连败 / 近 10 局胜率</li>
+          <li>当前英雄 / 团队阵容 / 阵容架构 verdict</li>
+          <li>教练人设摘要 (name + voice 首段)</li>
+          <li>教练当时的发言 (snapshot)</li>
+          <li>你的评价 (👍/👎/✏️改写)</li>
+          <li>匿名贡献者 ID (sha256[机器名+用户名][:16])</li>
+        </ul>
+      </div>
+      <div class="card" style="border-left:3px solid var(--rose)">
+        <strong style="color:var(--rose)">✗ 永远不收</strong>
+        <ul style="margin-top:8px;padding-left:18px;color:var(--txt);font-size:13px;line-height:1.9">
+          <li>召唤师名 / 真名 / 任何昵称</li>
+          <li>原始 puuid (只存 sha256 hash 前 12 位)</li>
+          <li>profiles.json 里的他人评价文本</li>
+          <li>raw 对局数据 / timeline</li>
+          <li>段位 / wins / losses (个人识别风险)</li>
+          <li>IP / 设备指纹 / 任何系统信息</li>
+          <li>不在反馈所在那一帧的任何上下文</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="margin-top:24px;font-size:16px;color:var(--phi)">用户控制 (PIPL 合规)</h3>
+    <table>
+      <tr><th>能力</th><th>怎么用</th></tr>
+      <tr><td>查看待贡献样本数</td><td>右下角 💝 贡献 按钮</td></tr>
+      <tr><td>导出全部待贡献样本</td><td>面板"导出 JSON" → 下载单个 bundle 文件</td></tr>
+      <tr><td>清空本地待贡献</td><td>面板"清空"按钮 (不可恢复, 除非已导出)</td></tr>
+      <tr><td>撤回同意</td><td>面板"撤回同意"按钮; 之后即使勾选也不写副本</td></tr>
+      <tr><td>更改上传地址</td><td>编辑 <code>data/contributed/upload_target.json</code></td></tr>
+    </table>
+
+    <h3 style="margin-top:24px;font-size:16px;color:var(--phi)">蒸馏路线 (基于样本量)</h3>
+    <table>
+      <tr><th>累计样本</th><th>能做什么</th><th>预期效果</th></tr>
+      <tr><td><strong>0 — 500</strong></td><td>验证 schema, 调 prompt 模板</td><td>不如直接调 Claude API</td></tr>
+      <tr><td><strong>500 — 2K</strong></td><td>SFT 一个 7B 模型 (Qwen2.5 / Llama-3)</td><td>风格像鹤哥, 但泛化弱</td></tr>
+      <tr><td><strong>2K — 5K</strong></td><td>+ DPO 偏好对齐 (good vs bad 对)</td><td>接近 Claude 在 LoL 教练垂域的水平</td></tr>
+      <tr><td><strong>5K — 10K</strong></td><td>+ 多 persona 适配 (聚类成 5-10 个原型 LoRA)</td><td>真正"千人千面"的本地模型</td></tr>
+      <tr><td><strong>> 10K</strong></td><td>发 Hugging Face 给社区</td><td>LoL 教练垂域 baseline 提供者</td></tr>
+    </table>
+    <p class="muted" style="margin-top:14px">参照基准: Stanford Alpaca 用 52K 样本; LIMA 论文用 1K 高质量样本就达到 GPT-3.5 水平. 我们的领域极窄 (LoL ARAM + 中文 + 心理学), 同样样本量下质量上限更高.</p>
+  </section>
+
+  <!-- ==== Section: Resilience ==== -->
+  <section id="resilience">
+    <h2>抗风险设计 <small>版本更新 / 玩家漂移 / 突发异常</small></h2>
+
+    <table>
+      <tr><th>风险</th><th>抵抗机制</th><th>状态</th></tr>
+      <tr><td>新英雄/装备没字典</td><td>显示 raw ID + 后台 KB refresh</td><td class="warn">部分</td></tr>
+      <tr><td>LoL balance 改动</td><td>数据带 patch tag, 训练按 patch 切片</td><td><span class="ok">✓</span></td></tr>
+      <tr><td>玩家段位/风格漂移</td><td>多窗口 (l30d vs alltime) + persona_history</td><td class="warn">部分</td></tr>
+      <tr><td>LCU 字段重命名</td><td>schema_version 路由</td><td><span class="ok">✓</span></td></tr>
+      <tr><td>网络/CommunityDragon 失败</td><td>Fallback 链: 本地→内嵌→online→raw</td><td class="warn">规划</td></tr>
+      <tr><td>突发崩溃</td><td>atomic write (tmp.replace) + append jsonl</td><td><span class="ok">✓</span></td></tr>
+      <tr><td>老 data/ 不兼容</td><td>v1 路径仍读, 新数据走 v2, 不强制迁移</td><td><span class="ok">✓</span></td></tr>
+    </table>
+  </section>
+
+  <!-- ==== Section: Roadmap ==== -->
+  <section id="roadmap">
+    <h2>未来规划 (5 个 Sprint) <small>每个 Sprint 1-2 周, 不憋大改动</small></h2>
+
+    <div class="sprint done">
+      <div class="tag">DONE</div>
+      <div>
+        <div class="name">Sprint 1 · 数据闭环 + v2 架构</div>
+        <div class="desc">migrate 到 v2 布局 (coach/me/games/players) · history + feedback 自动落盘 · psych_state 计算 · psych_timeline 监控成长 · 5 维 axes 画像 schema · 38 条心理学 KB · 教练 voice 接 KB</div>
+      </div>
+      <div class="eta">已完成</div>
+    </div>
+
+    <div class="sprint now">
+      <div class="tag">NOW</div>
+      <div>
+        <div class="name">Sprint 2 · 画像填充 + 知识库爬虫</div>
+        <div class="desc">infer-psych-axes 给 11 个老 profile 补 axes · LLM 真值验证 · cache_lol_kb.py 爬 CommunityDragon items/runes/champion_meta · 心理学 KB 调优</div>
+      </div>
+      <div class="eta">~1 周</div>
+    </div>
+
+    <div class="sprint next">
+      <div class="tag">NEXT</div>
+      <div>
+        <div class="name">Sprint 3 · 3 角色 + 抗风险 + 实时干预</div>
+        <div class="desc">coach/psych/caster 三角色切换器 · 危机检测正则上线 (现仅文档) · Circuit 熔断包 collectors · /api/health · patch detector · persona_history 追加机制</div>
+      </div>
+      <div class="eta">~1 周</div>
+    </div>
+
+    <div class="sprint next">
+      <div class="tag">NEXT</div>
+      <div>
+        <div class="name">Sprint 4 · 训练管线</div>
+        <div class="desc">build_training_set.py (chat 格式) · DPO 偏好对组装 · 冷启动用 Claude 当老师生成 1000 条样本 · LoRA 微调脚本 · 离线评估集</div>
+      </div>
+      <div class="eta">~2 周</div>
+    </div>
+
+    <div class="sprint later">
+      <div class="tag">LATER</div>
+      <div>
+        <div class="name">Sprint 5 · 实时复盘 + 多模型底座 + 联邦学习</div>
+        <div class="desc">局后 timeline 解析 · 多模型 backend 切换 (Claude/local LLM) · 数据导出 + 联邦学习准备 · 团队心态分析 · 比赛日 vs 平日状态差</div>
+      </div>
+      <div class="eta">3+ 周</div>
+    </div>
+
+    <p class="muted" style="margin-top:20px">详细 Sprint 任务清单见 <a href="ROADMAP.md">ROADMAP.md</a>.</p>
+  </section>
+
+  <!-- ==== Section: Boundary ==== -->
+  <section id="boundary">
+    <h2>边界与硬约束 <small>不是束缚, 是产品的承诺. 完整版见 <a href="BOUNDARIES.md">BOUNDARIES.md</a></small></h2>
+
+    <div class="boundary">
+      <h3>🔴 硬约束 (Hard Constraints — 任何情况都不破)</h3>
+      <table style="margin-top:12px;background:transparent">
+        <tr><th>触发</th><th>行为</th></tr>
+        <tr><td><strong>生命安全</strong>: 自伤 / 自杀 / "想结束" 关键词</td><td>立即推送危机热线, 停止所有游戏建议, 切心理专家角色</td></tr>
+        <tr><td><strong>法律/医学/临床心理</strong></td><td>明确拒绝, 推荐真人专业人士</td></tr>
+        <tr><td><strong>隐私</strong>: 数据上云 / 卖数据 / 未授权训练</td><td>禁止. 数据永远本地, 训练前明示</td></tr>
+        <tr><td><strong>客户端 ToS</strong>: 强制 dodge / 自动 ban / 显示禁止信息</td><td>禁止. 仅 LCU 只读</td></tr>
+        <tr><td><strong>未成年人</strong>: 段位/行为推断青春期玩家</td><td>降低毒舌, 不诱导长时游戏, 不给消费建议, 危机阈值降低</td></tr>
+      </table>
+    </div>
+
+    <div class="boundary" style="background:linear-gradient(135deg,rgba(255,138,77,.06),rgba(240,199,94,.04));border-color:rgba(255,138,77,.2)">
+      <h3 class="h3-soft">⚠️ 软边界 (可做但谨慎)</h3>
+      <table style="margin-top:12px;background:transparent">
+        <tr><th>能做</th><th>条件</th></tr>
+        <tr><td>毒舌 / 批评</td><td>仅 axes_source=manual 且用户确认接受</td></tr>
+        <tr><td>负反馈 (数据)</td><td>用事实不带评判, 给替代方案, 不羞辱</td></tr>
+        <tr><td>推断心态</td><td>从行为推, 不假装读心, 用"假设+验证"句式</td></tr>
+        <tr><td>推动行为变化</td><td>推喝水/拉伸/复盘, 不推"再来一把"</td></tr>
+      </table>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <h3 style="color:var(--green)">✅ 我们承诺什么</h3>
+      <ul style="list-style:none">
+        <li style="padding:3px 0">长期改善心态 (周/月维度)</li>
+        <li style="padding:3px 0">早期识别 tilt, 给具体建议</li>
+        <li style="padding:3px 0">跟踪你的成长曲线</li>
+        <li style="padding:3px 0">隐私第一, 数据不出本机</li>
+        <li style="padding:3px 0">持续演化 — KB 可加, AI 底座可换</li>
+      </ul>
+
+      <h3 style="color:var(--red);margin-top:14px">❌ 我们不承诺什么</h3>
+      <ul style="list-style:none">
+        <li style="padding:3px 0">一周上钻 / 一个月王者</li>
+        <li style="padding:3px 0">替代真人教练</li>
+        <li style="padding:3px 0">治好心理问题</li>
+        <li style="padding:3px 0">比 op.gg 更准的出装推荐</li>
+        <li style="padding:3px 0">永远开心 / 永远赢</li>
+      </ul>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <div>
+    <a href="README.md">README</a>
+    <a href="ROADMAP.md">ROADMAP</a>
+    <a href="PROFILES.md">PROFILES</a>
+    <a href="COACH.md">COACH</a>
+    <a href="PSYCH_SCHEMA.md">PSYCH_SCHEMA</a>
+    <a href="BOUNDARIES.md">BOUNDARIES</a>
+  </div>
+  <div style="margin-top:10px">
+    FFAN v2 · 2026-05 · Single-file Python · Windows · 本地运行
+  </div>
+</footer>
+
+</body></html>

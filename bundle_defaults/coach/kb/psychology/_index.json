@@ -1,0 +1,150 @@
+{
+  "_v": 1,
+  "_meta": {
+    "name": "FFAN 电竞心理学知识库",
+    "version": "2026.05.13-v1",
+    "purpose": "教练 AI 的 RAG / 训练数据 / Prompt 素材源. 通用 JSON/MD 格式, 与具体 AI 底座解耦.",
+    "license": "项目内部使用. 引用学术来源时保留 evidence 字段.",
+    "extends": "data/coach/kb/psychology/",
+    "compatible_with": ["claude", "gpt-4", "qwen2.5", "llama-3", "本地 LLM (无外部 API)"]
+  },
+
+  "entries": [
+    {
+      "file": "profile_axes.json",
+      "kind": "taxonomy",
+      "title": "5 维玩家画像 axes 词典",
+      "purpose": "教练发言 ctx + KB 匹配 + AI 推断模板",
+      "key_concepts": ["competitive_style", "comm_style", "pressure_response", "motivation_type", "tilt_profile", "adolescent_traps"]
+    },
+    {
+      "file": "tilt_types.jsonl",
+      "kind": "intervention_kb",
+      "count": 7,
+      "title": "Tendler tilt 7 类",
+      "purpose": "情绪失控类型识别 + 干预模板",
+      "subtypes": ["running_bad", "injustice", "hate_losing", "mistake", "entitlement", "revenge", "desperation"],
+      "critical": "desperation 触发时切到 crisis_signals.md 检测"
+    },
+    {
+      "file": "adolescent_traps.jsonl",
+      "kind": "intervention_kb",
+      "count": 6,
+      "title": "青春期 6 大心理陷阱",
+      "purpose": "16-22 岁玩家特定干预",
+      "trap_keys": ["T1", "T2", "T3", "T4", "T5", "T6"]
+    },
+    {
+      "file": "cbt_techniques.jsonl",
+      "kind": "intervention_kb",
+      "count": 8,
+      "title": "CBT 核心技巧",
+      "purpose": "认知行为疗法在电竞场景的应用",
+      "subtypes": ["thought_log", "cognitive_distortion", "reframe", "physiological_regulation", "thought_replacement", "behavior_activation"]
+    },
+    {
+      "file": "growth_mindset.jsonl",
+      "kind": "intervention_kb",
+      "count": 8,
+      "title": "成长型思维 reframe 模板",
+      "purpose": "Dweck 框架在电竞失败叙事中的应用",
+      "use_when": "玩家陷入固定型思维 / 完美主义 / 自我否定"
+    },
+    {
+      "file": "arousal_regulation.jsonl",
+      "kind": "intervention_kb",
+      "count": 5,
+      "title": "唤醒水平调节",
+      "purpose": "倒 U 理论 + 生理调节工具 (呼吸法/cue word/ritual)",
+      "subtypes": ["framework", "down_regulation", "up_regulation", "ritual", "self_talk"]
+    },
+    {
+      "file": "stress_inoculation.jsonl",
+      "kind": "intervention_kb",
+      "count": 4,
+      "title": "压力接种训练",
+      "purpose": "Meichenbaum 3 阶段 + 刻意练习 + 恢复",
+      "use_when": "玩家想 '练心态' / 抗压能力"
+    },
+    {
+      "file": "crisis_signals.md",
+      "kind": "safety_protocol",
+      "title": "🔴 危机识别 — 教练 AI 必读",
+      "purpose": "区分 tilt vs 真实心理危机. 触发 L3 信号时停止所有游戏建议, 切换危机模式.",
+      "priority": "highest",
+      "compliance": "教练 system prompt 必须包含 L3 关键词的硬约束"
+    },
+    {
+      "file": "communication_protocols.md",
+      "kind": "behavioral_protocol",
+      "title": "团队沟通协议",
+      "purpose": "按 comm_style 给的沟通策略 + ping 语义编码 + 反模式"
+    },
+    {
+      "file": "debrief_protocols.md",
+      "kind": "behavioral_protocol",
+      "title": "复盘协议 4 种",
+      "purpose": "按 motivation_type 选择复盘格式 (3-2-1 / WWW / KPT / PIE)"
+    }
+  ],
+
+  "matching_rules": {
+    "description": "教练 AI 选择 KB 条目的优先级",
+    "priority_order": [
+      "1. crisis_signals.md (L3 检测) — 始终最先",
+      "2. tilt_types.jsonl (psych_state.tilt.score > 0.5 时)",
+      "3. adolescent_traps.jsonl (age 标记 + 触发信号)",
+      "4. cbt_techniques.jsonl (识别到认知扭曲信号)",
+      "5. growth_mindset.jsonl (失败叙事 / 比较 / 自我否定)",
+      "6. arousal_regulation.jsonl (生理症状描述)",
+      "7. communication_protocols.md (沟通问题)",
+      "8. debrief_protocols.md (局后场景)",
+      "9. stress_inoculation.jsonl (训练规划)"
+    ]
+  },
+
+  "schema_field_map": {
+    "description": "KB 条目通用 schema 字段说明 (给其他 AI 底座理解)",
+    "fields": {
+      "_v": "schema 版本号",
+      "id": "全局唯一标识 (category.subtype.NN)",
+      "category": "顶层分类 (= 文件名)",
+      "subtype": "子类型 (= taxonomy 内的二级)",
+      "title": "人读标题",
+      "summary": "1-2 句话摘要 (RAG 检索用)",
+      "trigger": "结构化触发条件, 见下",
+      "intervention": "干预方案 — tone + voice_templates + behavior_suggestion",
+      "do": "干预时该做的 (positive list)",
+      "dont": "干预时不该做的 (negative list, prompt constraint)",
+      "evidence": "学术/书籍出处, 不是 AI 编的",
+      "tags": "用于 RAG 检索的关键词"
+    },
+    "trigger_schema": {
+      "psych_state": "对 players/<puuid>/psych_state.json 字段的条件匹配, 如 {streak_now: {max: -3}}",
+      "axes_match": "对 profile.psych.axes 的匹配, 如 {tilt_profile: ['易燃']}",
+      "signals_any": "文本关键词数组 (任一命中触发)",
+      "context_hint": "场景提示, 如 'in_game' / '局后'",
+      "adolescent_traps": "命中的 trap keys 数组"
+    }
+  },
+
+  "extension_guide": {
+    "description": "如何扩展这个 KB",
+    "to_add_entry": [
+      "1. 选合适的 category 文件 (或新建)",
+      "2. 用上面的 schema 写新行",
+      "3. 在 evidence 字段写出处 (不能是 AI 编的)",
+      "4. _v 递增如果改 schema; 不变如果只加条目"
+    ],
+    "to_localize": [
+      "voice_templates 是中文; 可加 voice_templates_en 字段做多语言",
+      "intervention.tone 词典见 profile_axes.json/intervention_tones"
+    ],
+    "to_swap_ai_backend": [
+      "本 KB 是纯 JSON/MD, 任何 AI 底座 (Claude/GPT/local LLM) 都能消费",
+      "Claude/GPT: 把整个 _index.json 当 system prompt 一部分",
+      "微调小模型: 用 tools/build_training_set.py (规划中) 转 SFT 格式",
+      "本地 LLM: 用 RAG 向量化每条 entry, 推理时检索 top-3"
+    ]
+  }
+}

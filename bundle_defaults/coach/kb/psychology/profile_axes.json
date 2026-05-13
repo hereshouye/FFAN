@@ -1,0 +1,385 @@
+{
+  "_v": 1,
+  "_meta": {
+    "description": "玩家心理画像 5 个维度. 每个维度 4 个互斥取值. 任意玩家用 5 元组表达 (共 4^5 = 1024 种组合).",
+    "purpose": "教练发言时的 ctx 输入 + KB 匹配 + 推断模板. 通用 JSON, 与具体 AI 底座解耦.",
+    "axes_count": 5,
+    "values_per_axis": 4,
+    "total_combinations": 1024,
+    "evidence": [
+      {"source": "Tendler 2011", "ref": "The Mental Game of Poker"},
+      {"source": "Csikszentmihalyi 1990", "ref": "Flow: The Psychology of Optimal Experience"},
+      {"source": "Dweck 2006", "ref": "Mindset: The New Psychology of Success"},
+      {"source": "Erikson 1968", "ref": "Identity: Youth and Crisis (青春期阶段)"},
+      {"source": "Deci & Ryan 1985", "ref": "Self-Determination Theory"}
+    ]
+  },
+
+  "axes": {
+    "competitive_style": {
+      "description": "竞技风格 — 在比赛中如何争夺主动权",
+      "values": [
+        {
+          "key": "攻击型",
+          "en": "aggressive",
+          "summary": "主动找战, 走脸压制, 接受短线高风险换长线收益",
+          "indicators": [
+            "favorite_champ_ids 包含刺客/战士",
+            "carry_priority >= 7",
+            "tags 含 carry/上头/走脸"
+          ],
+          "self_voice_signals": ["切", "冲", "秀", "carry", "走脸", "梭哈"],
+          "peer_voice_signals": ["上头", "梭哈", "无脑冲", "carry"],
+          "tactical_notes": "适合担任 ARAM 切入位, 不适合需要等大件的英雄"
+        },
+        {
+          "key": "控制型",
+          "en": "controlling",
+          "summary": "用控制 / 调度 / 视野压制对方节奏, 不强求亲手击杀",
+          "indicators": [
+            "favorite_champ_ids 包含坦克/辅助/法师 (CC 多)",
+            "carry_priority 中等 (4~7)"
+          ],
+          "self_voice_signals": ["控", "团", "节奏", "开团"],
+          "peer_voice_signals": ["开团好", "节奏带得起来"],
+          "tactical_notes": "适合先手开团位"
+        },
+        {
+          "key": "防守型",
+          "en": "defensive",
+          "summary": "稳健发育, 谨慎决策, 输得少但赢得也少",
+          "indicators": [
+            "favorite_champ_ids 包含坦克/奶妈",
+            "habits 含 苟 / 发育 / 稳",
+            "tags 含 心态稳"
+          ],
+          "self_voice_signals": ["苟", "稳", "发育", "后期", "等装"],
+          "peer_voice_signals": ["稳", "不浪", "后期一打五"],
+          "tactical_notes": "适合后期英雄, 阵容里需要他扛压"
+        },
+        {
+          "key": "适应型",
+          "en": "adaptive",
+          "summary": "看队友/对面再决定, 没有强烈个人风格, 容易团队配合",
+          "indicators": [
+            "top_champs 涵盖 3+ 不同角色",
+            "habits 含 看队友 / 看阵容"
+          ],
+          "self_voice_signals": ["看", "配合", "队友需要", "随便"],
+          "peer_voice_signals": ["好沟通", "什么位置都行"],
+          "tactical_notes": "ARAM 时可填补阵容缺口的角色"
+        }
+      ]
+    },
+
+    "comm_style": {
+      "description": "沟通模式 — 在团队中如何传递信息和接受信息",
+      "values": [
+        {
+          "key": "指挥型",
+          "en": "commanding",
+          "summary": "主动 ping / 打字 / 调度队友, 习惯当 shotcaller",
+          "indicators": [
+            "self_role 含 指挥 / shotcaller",
+            "self_desc 含 喊 / 喊队友 / 指挥",
+            "tags 含 指挥"
+          ],
+          "self_voice_signals": ["叫", "喊", "指挥", "我喊就上"],
+          "peer_voice_signals": ["指挥", "喊得起来", "shotcaller"],
+          "tactical_notes": "教练发言时可委托他做调度"
+        },
+        {
+          "key": "跟随型",
+          "en": "following",
+          "summary": "等指令再行动, 不主动开团但执行力强",
+          "indicators": ["habits 含 跟 / 配合", "self_desc 含 跟队友"],
+          "self_voice_signals": ["跟", "听", "配合", "队友先开"],
+          "peer_voice_signals": ["配合好", "跟得上"],
+          "tactical_notes": "需要队伍里有指挥型才发挥最好"
+        },
+        {
+          "key": "独立型",
+          "en": "independent",
+          "summary": "自己决策为主, 信息很少给队友, 但也很少被影响",
+          "indicators": [
+            "self_desc 含 独立 / 自己 / 单带 / 单干",
+            "comm 信号缺失"
+          ],
+          "self_voice_signals": ["自己", "我玩我的", "单"],
+          "peer_voice_signals": ["不太说话", "自己一套"],
+          "tactical_notes": "教练不要硬要求他响应; 但要给他清晰的边界"
+        },
+        {
+          "key": "协作型",
+          "en": "collaborative",
+          "summary": "和队友互问 / 一起决策, 沟通频次高且双向",
+          "indicators": ["premade_with 非空 + persona 提到双排"],
+          "self_voice_signals": ["一起", "我们", "商量", "看一下"],
+          "peer_voice_signals": ["沟通顺畅", "一起打", "好搭档"],
+          "tactical_notes": "和双排队友配合最好"
+        }
+      ]
+    },
+
+    "pressure_response": {
+      "description": "压力反应 — 在高压情境下的表现倾向",
+      "values": [
+        {
+          "key": "冷血",
+          "en": "ice_cold",
+          "summary": "压力下表现稳定, KDA 变化小, 不被情绪左右",
+          "indicators": [
+            "recent_form 波动小",
+            "tags 含 心态稳 / 大心脏",
+            "peer_review 含 稳"
+          ],
+          "self_voice_signals": ["稳", "无所谓", "看运气"],
+          "peer_voice_signals": ["心态稳", "不慌", "逆风不炸"],
+          "tactical_notes": "ARAM 后期最值得托付的位置"
+        },
+        {
+          "key": "高峰",
+          "en": "rises_under_pressure",
+          "summary": "压力越大表现越好, 关键局比 farm 局更稳",
+          "indicators": [
+            "self_voice 含 关键时刻 / 大场面",
+            "peer_voice 含 关键先生"
+          ],
+          "self_voice_signals": ["关键", "翻盘", "决胜"],
+          "peer_voice_signals": ["关键时刻", "翻盘", "大场面"],
+          "tactical_notes": "可委托打大龙 / 决胜团 / late game"
+        },
+        {
+          "key": "崩盘",
+          "en": "collapses_under_pressure",
+          "summary": "压力上来立刻失水准, 一次失误引发连锁",
+          "indicators": [
+            "self_desc 含 上头 / 心态炸",
+            "peer_review 含 心态 / 上头",
+            "tags 含 上头 / 心态"
+          ],
+          "self_voice_signals": ["心态炸", "上头", "送了"],
+          "peer_voice_signals": ["心态炸", "一波送崩", "上头不带打"],
+          "tactical_notes": "局势紧时不要让他承担关键决策"
+        },
+        {
+          "key": "累积",
+          "en": "cumulative",
+          "summary": "前几局还好, 但坏运气累积后逐渐失常",
+          "indicators": [
+            "self_voice 含 连败 / 累计 / 三局",
+            "peer_voice 含 越打越..."
+          ],
+          "self_voice_signals": ["连", "累", "累计"],
+          "peer_voice_signals": ["越打越烂", "局数多就崩"],
+          "tactical_notes": "建议局数限制 (e.g. 连败 2 就下)"
+        }
+      ]
+    },
+
+    "motivation_type": {
+      "description": "动机类型 — 玩游戏的主要驱动 (Self-Determination Theory 改编)",
+      "values": [
+        {
+          "key": "胜利",
+          "en": "winning_driven",
+          "summary": "只想赢, 不在意过程和评价",
+          "indicators": [
+            "carry_priority >= 8",
+            "self_desc 强调 carry / 上分",
+            "tags 含 carry / 上分"
+          ],
+          "self_voice_signals": ["赢", "上分", "carry"],
+          "peer_voice_signals": ["赢就行", "只看结果"],
+          "tactical_notes": "输了别讲过程, 直接讲下把怎么赢"
+        },
+        {
+          "key": "表现",
+          "en": "performance_driven",
+          "summary": "想秀, 想被看见, 在意 KDA/操作/亮眼镜头",
+          "indicators": [
+            "self_desc 含 秀 / 帅 / 亮眼",
+            "favorite_champ_ids 偏炫技英雄 (Yasuo/Lee/Riven)"
+          ],
+          "self_voice_signals": ["秀", "帅", "操作", "亮"],
+          "peer_voice_signals": ["秀", "操作", "亮眼"],
+          "tactical_notes": "夸 operationally 比夸赢更有效"
+        },
+        {
+          "key": "社交",
+          "en": "social_driven",
+          "summary": "为了和朋友一起玩, 输赢次要",
+          "indicators": [
+            "premade_with 非空且常开黑",
+            "self_voice 含 一起 / 朋友 / 双排"
+          ],
+          "self_voice_signals": ["一起", "开黑", "陪", "朋友"],
+          "peer_voice_signals": ["一起开黑", "好搭子"],
+          "tactical_notes": "他在不在乎结果取决于队友是不是熟人"
+        },
+        {
+          "key": "进步",
+          "en": "growth_driven",
+          "summary": "想变强, 喜欢复盘和学习, 接受失败作为代价",
+          "indicators": [
+            "self_voice 含 学 / 进步 / 复盘 / 练",
+            "habits 含 看高手 / 模仿"
+          ],
+          "self_voice_signals": ["学", "练", "复盘", "进步", "看高手"],
+          "peer_voice_signals": ["在练", "进步快", "肯学"],
+          "tactical_notes": "讲过程比讲结果更受用; 失败叙事重构对他最有效"
+        }
+      ]
+    },
+
+    "tilt_profile": {
+      "description": "上头特征 — 由 Tendler tilt 框架改编, 描述情绪失控的典型路径",
+      "values": [
+        {
+          "key": "易燃",
+          "en": "quick_to_tilt",
+          "summary": "一次失误 / 一次黑车就立刻 tilt, 表现断崖式下跌",
+          "indicators": [
+            "tags 含 上头 / 易炸",
+            "peer_voice 含 一上头",
+            "recent_form trend 经常突变"
+          ],
+          "self_voice_signals": ["上头", "炸", "梭"],
+          "peer_voice_signals": ["一上头", "心态突然就崩", "易燃"],
+          "tactical_notes": "干预要早 (l3 见兆头就介入), 强制断局阈值低"
+        },
+        {
+          "key": "慢热",
+          "en": "slow_burn",
+          "summary": "前几局还稳, 但累积到一定程度爆发, 之后很难拉回来",
+          "indicators": [
+            "self_voice 含 累 / 连败 / 越打越",
+            "longest_loss_l30d >= 5"
+          ],
+          "self_voice_signals": ["累", "连", "越打越"],
+          "peer_voice_signals": ["越打越烂", "前面还行后面不行"],
+          "tactical_notes": "适合"局数限制" — l4 连败必下"
+        },
+        {
+          "key": "钝感",
+          "en": "thick_skinned",
+          "summary": "几乎不上头, 黑车连败也不影响发挥, 但偶尔也会有 desperation tilt",
+          "indicators": [
+            "tags 含 心态稳 / 大心脏",
+            "recent_form 波动小"
+          ],
+          "self_voice_signals": ["无所谓", "下把"],
+          "peer_voice_signals": ["心态稳", "怎么都不炸"],
+          "tactical_notes": "干预只在极端连败 (l5+) 介入"
+        },
+        {
+          "key": "自调节",
+          "en": "self_regulating",
+          "summary": "能上头但自己会主动调节 (休息 / 换英雄 / 下机)",
+          "indicators": [
+            "habits 含 累了下 / 换个 / 休息",
+            "self_voice 含 累了就下 / 换"
+          ],
+          "self_voice_signals": ["累了下", "换一个", "歇会"],
+          "peer_voice_signals": ["自己会调节", "知道什么时候下"],
+          "tactical_notes": "教练只要 confirm 他的判断, 不要硬干预"
+        }
+      ]
+    }
+  },
+
+  "adolescent_traps": {
+    "description": "青春期 (16-22) 玩家高频心理陷阱. 与 axes 正交, 一个玩家可命中多个.",
+    "evidence": [
+      {"source": "Erikson 1968", "ref": "Identity vs Role Confusion"},
+      {"source": "Dweck 2006", "ref": "Fixed vs Growth Mindset"},
+      {"source": "Steinberg 2008", "ref": "A social neuroscience perspective on adolescent risk-taking"}
+    ],
+    "items": [
+      {
+        "key": "T1",
+        "title": "自我效能感脆弱",
+        "summary": "一次失败 ≈ 否定整体能力, 把 game outcome 上升到 self-worth",
+        "trigger_signals": ["self_voice 含 我废了 / 我菜 / 不配", "连败后自我贬低"],
+        "intervention_principle": "事件和身份解耦 (you're not bad, this game was bad)",
+        "voice_examples": [
+          "这把不是你不行, 是阵容没护到你",
+          "Kayn 单场表现 ≠ 你 Kayn 玩得好不好, 数据看 100 场不看 1 场"
+        ],
+        "do_not": ["附和负面叙事", "讲大道理", "和高手比较"]
+      },
+      {
+        "key": "T2",
+        "title": "同伴比较加剧",
+        "summary": "看完 stream / 看完队友后落差感强, 觉得自己永远不如别人",
+        "trigger_signals": ["self_voice 含 跟主播差远了 / 不如", "刚看完直播就上分"],
+        "intervention_principle": "比较替代 — vs past self, not vs streamer/teammate",
+        "voice_examples": [
+          "你 30 天前 Kayn 胜率 38%, 现在 55%, 这是真进步",
+          "别比 Faker, 比上把自己 — 上把那波你跑得对吗?"
+        ],
+        "do_not": ["再举一个高手例子", "用 elo 数据羞辱"]
+      },
+      {
+        "key": "T3",
+        "title": "冲动控制弱 (前额叶未成熟)",
+        "summary": "想再排一把 / 想换个英雄 / 想骂队友, 念头到行动只有 1 秒",
+        "trigger_signals": ["连败后立刻重排", "选人最后 5 秒突然换"],
+        "intervention_principle": "增加物理摩擦 (timer / 离屏 / 喝水), 让冲动 cool down",
+        "voice_examples": [
+          "下把再说. 喝口水, 60 秒过去你再想要不要排.",
+          "锁这个英雄你 3 天前刚连输 4 把, 真要锁?"
+        ],
+        "do_not": ["命令式 / 阻止 (会触发逆反)"]
+      },
+      {
+        "key": "T4",
+        "title": "完美主义陷阱",
+        "summary": "全或无思维 — 不上钻就废了, 不 carry 就没意义",
+        "trigger_signals": ["self_voice 含 不上 X 就废", "tags 含 完美主义"],
+        "intervention_principle": "区分 process goal (我跑得对) vs outcome goal (我赢了)",
+        "voice_examples": [
+          "上钻是结果, 不是你练的过程. 你今天 farm 比上周稳了 15%, 这是过程进步.",
+          "这把没 carry 但你保住了 ADC 4 次, 这就是 support 的赢"
+        ],
+        "do_not": ["附和 '是的不上钻就废了'", "讲 '段位不重要' (假大空)"]
+      },
+      {
+        "key": "T5",
+        "title": "失败容忍度低",
+        "summary": "输 2 局立刻退游戏, 或上头梭哈到 5 连败",
+        "trigger_signals": ["streak_now <= -2 时退游戏", "或 streak_now <= -2 时仍排队"],
+        "intervention_principle": "重新定义 '成功局' — 不止赢算赢, 学到 / 没炸 / 帮一个 也算",
+        "voice_examples": [
+          "今天输 2 你还想下机我支持 — 但等下复盘下你 W 的时机, 那一波明天就能赢回来",
+          "这把没赢但你 farm 还稳, 算 '没炸局'"
+        ],
+        "do_not": ["指责 '怎么这么玻璃心'", "强行继续"]
+      },
+      {
+        "key": "T6",
+        "title": "社交焦虑",
+        "summary": "不敢用麦, 不敢 ping, 怕被队友指责",
+        "trigger_signals": ["self_role 含 跟 / 配合", "comm_style = 跟随", "premade_with 空"],
+        "intervention_principle": "沟通分级递进: 打字 → ping → 短句 → 完整沟通",
+        "voice_examples": [
+          "这把先用 ping 就行, 不用打字解释",
+          "队友凶你别理, 你 ping 你的, 节奏掌握在你手里"
+        ],
+        "do_not": ["逼他用麦", "嘲笑'怕什么'"]
+      }
+    ]
+  },
+
+  "intervention_tones": {
+    "description": "教练发言的语气分类. KB 条目的 intervention.tone 字段从此取值.",
+    "values": [
+      {"key": "温柔", "use_when": "玩家自我效能感低 / 连败 / 受挫"},
+      {"key": "毒舌", "use_when": "玩家自满 / 上头梭哈 / 鄙视复盘"},
+      {"key": "中性", "use_when": "信息传递 / 战术建议"},
+      {"key": "鼓励", "use_when": "进步可见 / 关键局开始前"},
+      {"key": "坚定", "use_when": "需要 cut off 行为 (强制下机 / 别换英雄)"},
+      {"key": "调侃", "use_when": "气氛好 / 平局 / 双排"}
+    ]
+  }
+}

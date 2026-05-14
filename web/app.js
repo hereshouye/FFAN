@@ -849,7 +849,7 @@ async function saveGameRecap(gid, panel){
     });
     const j = await r.json();
     if(j.ok){
-      status.textContent = "已保存 ✓" + (j.contributed ? " + 已贡献" : "");
+      status.textContent = "已保存 ✓" + (j.contributed ? " · 已贡献 (同局会覆盖旧版本)" : "");
       // 更新顶部时间戳显示
       const head = panel.querySelector(".rc-head");
       if(head && j.recap && j.recap.updated_at){

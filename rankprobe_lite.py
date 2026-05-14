@@ -648,6 +648,53 @@ def _load_contrib_consent():
     try: return json.loads(p.read_text(encoding="utf-8"))
     except Exception: return None
 
+def _migrate_legacy_recap_contributions():
+    """老版本 (commit f9797e7 之前) 把每次编辑都存成 recap_<gid>_<ts>.json,
+    多次编辑同一局会留 N 份重复. 合并: 同 gid 只保留最新一份, 重命名为 canonical
+    recap_<gid>.json. 启动时跑一次, 静默处理.
+    """
+    if not CONTRIB_DIR.exists(): return
+    legacy = list(CONTRIB_DIR.glob("recap_*_*.json"))
+    if not legacy: return
+    # 按 gid 分组 (recap_<gid>_<ts>.json → gid)
+    by_gid = {}
+    for p in legacy:
+        try:
+            gid = p.stem.split("_")[1]
+            by_gid.setdefault(gid, []).append(p)
+        except IndexError:
+            continue
+    merged = 0
+    for gid, files in by_gid.items():
+        files.sort(key=lambda p: p.stat().st_mtime)   # 最旧在前, 最新在尾
+        canonical = CONTRIB_DIR / f"recap_{gid}.json"
+        # canonical 已存在 → 全部旧时间戳版删掉
+        if canonical.exists():
+            for p in files:
+                try: p.unlink(); merged += 1
+                except Exception: pass
+        else:
+            # 保留最新一份重命名为 canonical, 其它删掉
+            latest = files[-1]
+            try:
+                # 读出来重写, 给它加个 revision_count = N
+                payload = json.loads(latest.read_text(encoding="utf-8"))
+                payload.setdefault("revision_count", len(files))
+                payload.setdefault("first_contributed_at",
+                                   files[0].stat().st_mtime
+                                   and dt.datetime.fromtimestamp(
+                                       files[0].stat().st_mtime).isoformat(timespec="seconds"))
+                canonical.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
+                                     encoding="utf-8")
+                for p in files:
+                    try: p.unlink(); merged += 1
+                    except Exception: pass
+            except Exception:
+                continue
+    if merged:
+        push_log(f"[migrate] 合并 {merged} 份重复 recap 贡献 → 每局只剩 1 份 canonical")
+
+
 def _restore_last_champ_select_view():
     """启动时把 me/last_champ_select_view.json 读回 STATE['last_champ_select'].
 
@@ -772,12 +819,18 @@ def _save_game_recap(gid, mood, free_text, tags):
 
 
 def _save_game_recap_contribution(gid, mood, free_text, tags):
-    """脱敏 + 写到 data/contributed/recap_<gid>_<ts>.json. 不含 puuid/真名."""
+    """脱敏 + 写到 data/contributed/recap_<gid>.json (每局只保留最新一份).
+
+    用户重复编辑同一局复盘时, 不再积累 N 份历史版本.
+    payload 里 _ts / revision_count 仍然记录最新时间和编辑次数,
+    便于训练时按时间切片或评估熟度.
+
+    旧版可能写过 recap_<gid>_<ts>.json (带时间戳), 这里也一并清理.
+    """
     consent = _load_contrib_consent()
     if (consent or {}).get("action") == "revoke":
         return None
     detail = _read_game_detail(gid) or {}
-    # 抽取游戏上下文 (训练时模型需要知道 "对什么样的局做的复盘")
     my_mate = next((m for m in (detail.get("mates") or []) if m.get("is_me")), None) or {}
     team_champs = [m.get("champion_name") for m in (detail.get("mates") or [])
                    if m.get("champion_name")]
@@ -790,24 +843,43 @@ def _save_game_recap_contribution(gid, mood, free_text, tags):
         "team_champs":    team_champs,
     }
     CONTRIB_DIR.mkdir(parents=True, exist_ok=True)
+    canonical = CONTRIB_DIR / f"recap_{gid}.json"
+
+    # 同 gid 历史时间戳版 (老格式 recap_<gid>_<ts>.json) 清掉
+    for old in CONTRIB_DIR.glob(f"recap_{gid}_*.json"):
+        try: old.unlink()
+        except Exception: pass
+
+    # 已有 canonical → 读出 revision_count 加 1, 也保留首次贡献时间
+    first_ts = None
+    revision = 1
+    if canonical.exists():
+        try:
+            prev = json.loads(canonical.read_text(encoding="utf-8"))
+            first_ts = prev.get("first_contributed_at") or prev.get("_ts")
+            revision = int(prev.get("revision_count", 1)) + 1
+        except Exception:
+            pass
+
+    now = dt.datetime.now().isoformat(timespec="seconds")
     payload = {
-        "_v":       1,
-        "_ts":      dt.datetime.now().isoformat(timespec="seconds"),
-        "_patch":   CURRENT_PATCH or "",
-        "anon_id":  _anon_contributor_id(),
-        "kind":     "game_recap",
-        "context":  context,
+        "_v":                    1,
+        "_ts":                   now,
+        "_patch":                CURRENT_PATCH or "",
+        "anon_id":               _anon_contributor_id(),
+        "kind":                  "game_recap",
+        "revision_count":        revision,
+        "first_contributed_at":  first_ts or now,
+        "context":               context,
         "recap": {
             "mood":      mood,
             "free_text": free_text,
             "tags":      tags,
         },
     }
-    ts = dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-    path = CONTRIB_DIR / f"recap_{gid}_{ts}.json"
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
-                    encoding="utf-8")
-    return path
+    canonical.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
+                         encoding="utf-8")
+    return canonical
 
 
 def _read_game_detail(gid):
@@ -3973,6 +4045,8 @@ def main():
     load_psych_kb(verbose=False)
     # 启动恢复: 上次的 champ_select view (FFAN 重启后不再"等待第一次选人")
     _restore_last_champ_select_view()
+    # 一次性迁移: 合并老版本时间戳格式的 recap 贡献到 canonical (每局只剩 1 份)
+    _migrate_legacy_recap_contributions()
     push_log(f"[boot] FFAN, Python {sys.version.split()[0]}"
              + (" [DEMO]" if demo else ""))
     push_log(f"[boot] 数据 {DATA_DIR}")

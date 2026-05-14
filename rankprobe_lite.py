@@ -648,6 +648,92 @@ def _load_contrib_consent():
     try: return json.loads(p.read_text(encoding="utf-8"))
     except Exception: return None
 
+def _restore_last_champ_select_view():
+    """启动时把 me/last_champ_select_view.json 读回 STATE['last_champ_select'].
+
+    避免重启 FFAN 后界面回到"等待第一次选人"空状态. 加 restored=True 标记.
+    """
+    p = ME_DIR / "last_champ_select_view.json"
+    if not p.exists(): return
+    try:
+        cs = json.loads(p.read_text(encoding="utf-8"))
+        if not isinstance(cs, dict): return
+        cs["restored"] = True
+        # 文件 mtime 作为 ended_at 兜底 (如果原本没记录)
+        cs.setdefault("ended_at", p.stat().st_mtime)
+        cs.setdefault("ended_phase", "Restored")
+        with _state_lock:
+            STATE["last_champ_select"] = cs
+        push_log(f"[boot] 恢复上次选人快照 (mtime={int(p.stat().st_mtime)})")
+    except Exception as e:
+        push_log(f"[boot] 恢复 last_champ_select 失败: {e}")
+
+
+def _read_match_history(limit=30):
+    """读 games/_index.jsonl + 增量从 eog.json 提取我的 champion / win.
+
+    返回 [{gid, ts_iso, date, queue_id, queue_name, duration_s, my_champ_id,
+           my_champ_name, my_win}], 最新在前.
+    """
+    idx_path = GAMES_DIR / "_index.jsonl"
+    if not idx_path.exists(): return []
+    rows = []
+    try:
+        with idx_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line: continue
+                try: rows.append(json.loads(line))
+                except Exception: continue
+    except Exception:
+        return []
+    # 最新在前
+    rows.sort(key=lambda r: r.get("_ts") or r.get("ts") or "", reverse=True)
+    rows = rows[:max(1, int(limit))]
+
+    me_puuid = (STATE.get("me") or {}).get("puuid", "")
+    out = []
+    for r in rows:
+        gid = r.get("game_id")
+        item = {
+            "gid":         gid,
+            "ts":          r.get("ts") or r.get("_ts") or "",
+            "queue_id":    r.get("queue_id"),
+            "queue_name":  r.get("queue_name") or "",
+            "duration_s":  r.get("duration_s") or 0,
+            "win_team":    r.get("win_team") or 0,
+            "my_champ_id":   None,
+            "my_champ_name": "",
+            "my_win":        None,
+        }
+        # 从 eog.json 找我的参与信息 (best-effort, eog 不存在就跳过)
+        eog_path = GAMES_DIR / str(gid) / "eog.json"
+        if me_puuid and eog_path.exists():
+            try:
+                eog = json.loads(eog_path.read_text(encoding="utf-8"))
+                for p in (eog.get("participants") or []):
+                    if p.get("puuid") == me_puuid:
+                        item["my_champ_id"]   = p.get("champion_id")
+                        item["my_champ_name"] = (CHAMPIONS_BY_CID.get(p.get("champion_id")) or {}).get("name") or ""
+                        item["my_win"]        = (p.get("team_id") == item["win_team"]) if item["win_team"] else None
+                        break
+            except Exception:
+                pass
+        # date string for grouping (优先用 ts, 其次 _ts)
+        ts_str = item["ts"]
+        try:
+            # ts 是 ISO with "Z" or local format
+            if ts_str.endswith("Z"):
+                d = dt.datetime.fromisoformat(ts_str[:-1])
+            else:
+                d = dt.datetime.fromisoformat(ts_str[:19])
+            item["date"] = d.strftime("%Y-%m-%d")
+        except Exception:
+            item["date"] = (ts_str or "")[:10]
+        out.append(item)
+    return out
+
+
 def _contrib_upload_target():
     """读 data/contributed/upload_target.json (用户可编辑). 默认 GitHub Issue 模板."""
     p = CONTRIB_DIR / "upload_target.json"
@@ -2117,9 +2203,10 @@ def probe_loop():
                     STATE["champ_select"] = cs
                     STATE["ts"] = time.time()
                 _broadcast("state", json.dumps(_state_snapshot(), ensure_ascii=False))
-                # 写盘: 选人 session 快照 + 队友画像缓存
+                # 写盘: 选人 session 快照 + 队友画像缓存 + 处理后的 view 快照 (供 FFAN 重启恢复)
                 try:
                     collect_champ_select_snapshot(sess)
+                    _write_json(ME_DIR / "last_champ_select_view.json", cs)
                     puuids = [(c.get("puuid") or "") for c in (sess.get("myTeam") or [])]
                     collect_player_cache(api, puuids)
                 except Exception as e:
@@ -2136,6 +2223,10 @@ def probe_loop():
                 STATE["last_champ_select"] = last
                 STATE["champ_select"] = None
                 STATE["ts"] = time.time()
+            try:
+                _write_json(ME_DIR / "last_champ_select_view.json", last)
+            except Exception:
+                pass
             _broadcast("state", json.dumps(_state_snapshot(), ensure_ascii=False))
             push_log(f"[probe] 选人结束 → 切到「上一局」展示, phase={phase}")
 
@@ -2238,6 +2329,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._get_contribute_stats()
         if path == "/api/contribute/export":
             return self._get_contribute_export()
+
+        if path == "/api/match_history":
+            try: lim = int(params.get("limit", "30"))
+            except ValueError: lim = 30
+            self._send(200, {"items": _read_match_history(lim)}); return
 
         if path == "/stream":
             return self._stream()
@@ -3637,6 +3733,8 @@ def main():
     load_profiles()
     load_coach(verbose=False)
     load_psych_kb(verbose=False)
+    # 启动恢复: 上次的 champ_select view (FFAN 重启后不再"等待第一次选人")
+    _restore_last_champ_select_view()
     push_log(f"[boot] FFAN, Python {sys.version.split()[0]}"
              + (" [DEMO]" if demo else ""))
     push_log(f"[boot] 数据 {DATA_DIR}")

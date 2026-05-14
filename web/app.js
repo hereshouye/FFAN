@@ -19,7 +19,11 @@ function agoText(unixTs){
 }
 
 function renderState(s){
+  const prevPhase = (STATE && STATE.phase) || "";
   STATE = s;
+  renderDrawerHandle(s);                              // 抽屉 handle 永远跟随 state 更新
+  // phase 从 ChampSelect 切到别的 → 大概率有新对局, 刷新历史 (EOG 也许还没入库, 30s 内会再刷)
+  if(prevPhase === "ChampSelect" && s.phase !== "ChampSelect") loadMatchHistory();
   $("#dot").classList.toggle("on", !!s.lcu_online);
   if(!s.lcu_online){
     $("#status").innerHTML = "等待客户端...";
@@ -553,19 +557,155 @@ document.addEventListener("keydown", e => {
 });
 
 // 点击 mate 卡片打开模态框 (事件委托, 适配 SSE 重渲染)
+// 修复: 选人结束后 STATE.champ_select = null, 必须 fallback 到 last_champ_select
+// 否则游戏开始就再也点不开编辑 (issue #1)
 $("#mates").addEventListener("click", e => {
   const card = e.target.closest(".mate");
   if(!card) return;
-  const cs = (STATE || {}).champ_select || {};
+  const s = STATE || {};
+  const cs = s.champ_select || s.last_champ_select || {};
   const mates = cs.mates || [];
   const cellId = card.dataset.cellId;
   const mate = mates.find(m => String(m.cell_id) === String(cellId));
   if(mate) openMateModal(mate);
 });
 
+/* ============ 底部对局抽屉 (常驻显示, 不被 phase 切换影响) ============ */
+function dateLabel(dateStr){
+  if(!dateStr) return "未知";
+  const today = new Date(); today.setHours(0,0,0,0);
+  const yest  = new Date(today.getTime() - 86400000);
+  try{
+    const d = new Date(dateStr + "T00:00:00");
+    if(d.getTime() === today.getTime()) return "今天";
+    if(d.getTime() === yest.getTime())  return "昨天";
+    return dateStr;
+  }catch(_){ return dateStr; }
+}
+
+function fmtDuration(s){
+  if(!s) return "—";
+  const m = Math.floor(s/60), sec = s%60;
+  return `${m}分${sec<10?"0":""}${sec}秒`;
+}
+
+// 老数据里 queue_name 有 mojibake (� 之类), 这种就退回 queue_id
+function safeQueue(name, id){
+  if(!name) return `queue ${id||"?"}`;
+  // U+FFFD 或全是问号 → 视为乱码
+  if(name.includes("�") || /^[?\s]+$/.test(name)) return `queue ${id||"?"}`;
+  return name;
+}
+
+function renderDrawerHandle(s){
+  const cur = $("#md-handle-current");
+  const phase = $("#md-handle-phase");
+  const cs = (s && (s.champ_select || s.last_champ_select)) || null;
+  if(cs){
+    const myPick = cs.my_pick_name || "—";
+    const recap = !!(s && !s.champ_select && s.last_champ_select);
+    const restored = !!(cs.restored);
+    cur.textContent = `${myPick} · ${(cs.mates||[]).length}人${restored ? " (已恢复)" : ""}`;
+  } else {
+    cur.textContent = "暂无对局信息";
+  }
+  phase.textContent = (s && s.phase) || "—";
+}
+
+async function loadMatchHistory(){
+  try{
+    const j = await fetch("/api/match_history?limit=30").then(r=>r.json());
+    renderMatchHistory(j.items || []);
+  }catch(_){ /* server reloading */ }
+}
+
+function renderMatchHistory(items){
+  const list = $("#md-list");
+  if(!items.length){
+    list.innerHTML = `<div class="md-empty">还没有对局记录. 玩完一局自动出现.</div>`;
+    return;
+  }
+  // 按 date 分组, 保持最新在前
+  const groups = [];
+  const seen = new Map();
+  for(const it of items){
+    const key = it.date || "—";
+    if(!seen.has(key)){
+      const g = {date: key, items: []};
+      seen.set(key, g); groups.push(g);
+    }
+    seen.get(key).items.push(it);
+  }
+  const curCs = (STATE && (STATE.champ_select || STATE.last_champ_select)) || null;
+  const isLive = !!(STATE && STATE.champ_select);
+
+  let html = "";
+  // 如果当前有 champ_select (实时或已恢复), 在最顶上插入一行"当前对局"
+  if(curCs){
+    const myCid = curCs.my_pick_cid;
+    const myName = curCs.my_pick_name || "—";
+    const label = isLive ? "● 选人中"
+                : curCs.restored ? "○ 恢复"
+                : "○ 上一局";
+    const resultClass = isLive ? "live" : "unknown";
+    html += `<div class="md-date">当前 / 最近 <span class="count">·</span></div>`;
+    html += `<div class="md-item current">
+      <img class="md-champ-ic" src="${myCid ? champIcon(myCid) : ''}" onerror="this.style.opacity=.2">
+      <div class="md-meta">
+        <div class="md-line1">
+          <span class="md-champ">${esc(myName)}</span>
+          <span class="md-queue">${(curCs.mates||[]).length}人队伍</span>
+        </div>
+        <div class="md-line2">${esc(curCs.ended_phase || STATE.phase || "—")}</div>
+      </div>
+      <span class="md-result ${resultClass}">${label}</span>
+    </div>`;
+  }
+  for(const g of groups){
+    html += `<div class="md-date">${esc(dateLabel(g.date))} <span class="count">${g.items.length} 局</span></div>`;
+    for(const it of g.items){
+      const win = it.my_win;
+      const resCls = win === true ? "win" : win === false ? "loss" : "unknown";
+      const resTxt = win === true ? "胜" : win === false ? "负" : "—";
+      const champ  = it.my_champ_name || "?";
+      const tsShort = (it.ts || "").slice(11,16);
+      html += `<div class="md-item" data-gid="${it.gid}">
+        <img class="md-champ-ic" src="${it.my_champ_id ? champIcon(it.my_champ_id) : ''}" onerror="this.style.opacity=.2">
+        <div class="md-meta">
+          <div class="md-line1">
+            <span class="md-champ">${esc(champ)}</span>
+            <span class="md-queue">${esc(safeQueue(it.queue_name, it.queue_id))}</span>
+          </div>
+          <div class="md-line2">${esc(tsShort)} · ${fmtDuration(it.duration_s)} · gid ${it.gid}</div>
+        </div>
+        <span class="md-result ${resCls}">${resTxt}</span>
+      </div>`;
+    }
+  }
+  list.innerHTML = html;
+}
+
+function bindMatchDrawer(){
+  const drawer = $("#match-drawer");
+  const handle = $("#md-handle");
+  if(!drawer || !handle) return;
+  // 默认折叠状态: 桌面打开, 移动端折叠 (高度有限)
+  const collapsed = (localStorage.getItem("md_collapsed") === "1");
+  if(collapsed) drawer.classList.add("collapsed");
+  handle.addEventListener("click", () => {
+    drawer.classList.toggle("collapsed");
+    localStorage.setItem("md_collapsed",
+      drawer.classList.contains("collapsed") ? "1" : "0");
+  });
+  // 30 秒自动刷新一次历史 (新对局 EOG 入库后能看到)
+  setInterval(loadMatchHistory, 30000);
+  loadMatchHistory();
+}
+
 /* 初始化 */
 bindCoachFeedback();
 bindContribPanel();
+bindMatchDrawer();
 // 首次勾选"贡献"时自动写一条 grant consent (PIPL 取证用)
 document.addEventListener("change", e => {
   if(e.target && e.target.id === "coach-fb-contrib" && e.target.checked){

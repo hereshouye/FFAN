@@ -126,6 +126,20 @@
   </div>
 </div>
 
+<!-- 底部对局抽屉 (常驻显示, 按日期分组. 当前/最近一局始终在顶部) -->
+<div class="match-drawer" id="match-drawer">
+  <button class="md-handle" id="md-handle" title="展开/折叠">
+    <span class="md-handle-current" id="md-handle-current">—</span>
+    <span class="md-handle-phase" id="md-handle-phase">—</span>
+    <span class="md-handle-caret" id="md-handle-caret">▲</span>
+  </button>
+  <div class="md-body" id="md-body">
+    <div class="md-list" id="md-list">
+      <div class="md-empty">还没有对局记录. 玩完一局自动出现.</div>
+    </div>
+  </div>
+</div>
+
 <div class="search-results" id="sr"></div>
 <div class="search">
   <input id="q" type="text" autocomplete="off"

@@ -482,6 +482,128 @@ async function showChampRecs(cid, name){
 /* ===== 编辑画像模态框 ===== */
 let _modal_puuid = "";
 let _modal_mate  = null;
+let _QUIZ_QUESTIONS = null;     // 缓存 quiz 题库
+const _quizAnswers = {};         // 当前 modal 的答案 {q_id: choice_id}
+
+const AXIS_LABEL = {
+  competitive_style: "竞争风格",
+  comm_style:        "沟通风格",
+  pressure_response: "压力反应",
+  motivation_type:   "动机类型",
+  tilt_profile:      "上头模式",
+};
+const AXIS_VALUE_LABEL = {
+  carry_seeker:"主 carry 型", team_player:"团队配合型", supporter:"辅助型", challenger:"逆风挑战型",
+  silent:"沉默型", chatty:"话多型", caller:"指挥型", reactive:"被动响应型",
+  calm:"冷静型", aggressive:"激进型", avoidance:"回避型", analytical:"分析型",
+  competitive:"竞技导向", social:"社交导向", mastery:"钻研导向", escape:"消遣导向",
+  short_fuse:"一炸就上头", slow_burn:"慢慢累积", compartmentalized:"一局一重置", immune:"几乎不上头",
+};
+
+async function loadQuizQuestions(){
+  if(_QUIZ_QUESTIONS) return _QUIZ_QUESTIONS;
+  try{
+    const j = await fetch("/api/profile/quiz/questions").then(r=>r.json());
+    _QUIZ_QUESTIONS = j.questions || [];
+  }catch(_){ _QUIZ_QUESTIONS = []; }
+  return _QUIZ_QUESTIONS;
+}
+
+function renderQuiz(){
+  const wrap = $("#quiz-questions");
+  const qs = _QUIZ_QUESTIONS || [];
+  if(!qs.length){ wrap.innerHTML = '<div class="quiz-hint">题库加载失败</div>'; return; }
+  wrap.innerHTML = qs.map((q, i) => `
+    <div class="quiz-q" data-qid="${q.id}">
+      <div class="q-text"><span class="idx">${i+1}.</span>${esc(q.text)}</div>
+      <div class="quiz-options">
+        ${q.options.map(o => `
+          <label class="quiz-opt${_quizAnswers[q.id]===o.id?" checked":""}">
+            <input type="radio" name="quiz-${q.id}" value="${o.id}" ${_quizAnswers[q.id]===o.id?"checked":""}>
+            <span>${esc(o.text)}</span>
+          </label>
+        `).join("")}
+      </div>
+    </div>
+  `).join("");
+  updateQuizProgress();
+}
+
+function updateQuizProgress(){
+  const total = (_QUIZ_QUESTIONS || []).length;
+  const n = Object.keys(_quizAnswers).length;
+  const p = $("#quiz-progress");
+  if(p) p.textContent = n === 0 ? "未答" : `${n}/${total}`;
+}
+
+async function openQuizPanel(){
+  await loadQuizQuestions();
+  // 从已有 profile.psych.axes 反推: 没办法精确反推 answers, 只能展示当前 axes
+  const persona = ((_modal_mate||{}).profile||{}).persona || {};
+  // 注: persona 里没有 axes, axes 在 profile.psych 里 — 模态打开时 mate 对象不一定带
+  // 这里就先空答案让用户重新答 (或者后续从 STATE 读 mate.psych 也行)
+  Object.keys(_quizAnswers).forEach(k => delete _quizAnswers[k]);
+  // 试着从 mate.psych 拿已有 axes (如果传过来)
+  const psych = (_modal_mate||{}).psych || ((_modal_mate||{}).profile||{}).psych || null;
+  if(psych && psych.axes){
+    renderQuizAxes(psych.axes);
+  } else {
+    $("#quiz-axes").hidden = true;
+  }
+  renderQuiz();
+  $("#quiz-body").hidden = false;
+  $("#quiz-toggle").textContent = "折叠 ▲";
+}
+
+function closeQuizPanel(){
+  $("#quiz-body").hidden = true;
+  $("#quiz-toggle").textContent = "展开 ▼";
+}
+
+function renderQuizAxes(axes){
+  const box = $("#quiz-axes");
+  if(!axes || !Object.keys(axes).length){ box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = "<div style='color:var(--phi);font-weight:600;margin-bottom:4px'>当前 axes:</div>" +
+    Object.entries(axes).filter(([_,v]) => v).map(([k,v]) =>
+      `<div class="axis"><span class="k">${esc(AXIS_LABEL[k] || k)}</span><span class="v">${esc(AXIS_VALUE_LABEL[v] || v)}</span></div>`
+    ).join("");
+}
+
+async function saveQuiz(){
+  if(!_modal_puuid) return;
+  const status = $("#quiz-status");
+  if(!Object.keys(_quizAnswers).length){
+    status.classList.add("err");
+    status.textContent = "至少答 1 题";
+    return;
+  }
+  status.classList.remove("err");
+  status.textContent = "计算中...";
+  try{
+    const r = await fetch("/api/profile/quiz", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({puuid: _modal_puuid, answers: _quizAnswers}),
+    });
+    const j = await r.json();
+    if(j.ok){
+      status.textContent = `已存 (${j.answered}/${j.total} 题, 命中 ${j.coverage.length} 轴)`;
+      renderQuizAxes(j.axes);
+    } else {
+      status.classList.add("err");
+      status.textContent = "失败: " + (j.err || "?");
+    }
+  }catch(e){
+    status.classList.add("err");
+    status.textContent = "网络错误: " + e.message;
+  }
+}
+
+function clearQuiz(){
+  Object.keys(_quizAnswers).forEach(k => delete _quizAnswers[k]);
+  renderQuiz();
+  $("#quiz-status").textContent = "";
+}
 
 function openMateModal(mate){
   if(!mate || !mate.puuid){ return; }
@@ -563,6 +685,11 @@ function closeMateModal(force=false){
   $("#modal-bg").classList.remove("on");
   _modal_puuid = "";
   _modal_mate  = null;
+  // 重置 quiz 面板
+  closeQuizPanel();
+  Object.keys(_quizAnswers).forEach(k => delete _quizAnswers[k]);
+  $("#quiz-progress").textContent = "未答";
+  $("#quiz-status").textContent = "";
 }
 
 async function saveMatePersona(){
@@ -602,6 +729,23 @@ $("#modal-save").onclick   = saveMatePersona;
 $("#modal-bg").addEventListener("click", e => {
   if(e.target.id === "modal-bg") closeMateModal();
 });
+// quiz 面板展开 / 选项点击 / 保存 / 清空
+$("#quiz-toggle").addEventListener("click", () => {
+  if($("#quiz-body").hidden) openQuizPanel();
+  else closeQuizPanel();
+});
+$("#quiz-questions").addEventListener("change", e => {
+  if(e.target.name && e.target.name.startsWith("quiz-")){
+    const qid = e.target.name.slice(5);
+    _quizAnswers[qid] = e.target.value;
+    // 更新这道题的视觉勾选状态
+    e.target.closest(".quiz-q").querySelectorAll(".quiz-opt")
+      .forEach(l => l.classList.toggle("checked", l.querySelector("input").checked));
+    updateQuizProgress();
+  }
+});
+$("#quiz-save").addEventListener("click", saveQuiz);
+$("#quiz-clear").addEventListener("click", clearQuiz);
 // 模态框内删除按钮 (✕ on self_voice / 每条 peer_voice)
 $("#modal-current").addEventListener("click", e => {
   const btn = e.target.closest(".persona-del");
@@ -796,7 +940,16 @@ async function expandHistoryItem(gid){
     const rcMood = (recap && recap.mood) || "";
     const rcText = (recap && recap.free_text) || "";
     const rcTags = (recap && (recap.tags||[]).join(" / ")) || "";
+    const rcFeelings = new Set((recap && recap.feelings) || []);
+    const rcRating = (recap && recap.self_rating) || 0;
     const updated = recap && recap.updated_at ? `<span class="rc-updated">${esc(recap.updated_at.slice(0,16).replace("T"," "))} 已保存</span>` : "";
+    // 8 种 mood, 单选
+    const MOODS_8 = [
+      ["happy","😊","开心"], ["satisfied","😎","满意"], ["excited","🤩","兴奋"], ["neutral","😐","平静"],
+      ["tired","😩","疲惫"], ["frustrated","😤","郁闷"], ["angry","😡","生气"], ["tilted","🤯","上头"],
+    ];
+    // 11 种 feelings, 多选
+    const FEELINGS = ["翻盘","被坑","装备成型","操作秀","队友给力","队友拖后腿","对面太强","我太菜","时间紧迫","顺风","节奏"];
     const recapHtml = `
       <div class="md-recap" data-gid="${gid}">
         <div class="rc-head">
@@ -804,8 +957,20 @@ async function expandHistoryItem(gid){
           ${updated}
         </div>
         <div class="rc-moods">
-          ${["happy","neutral","frustrated","tilted"].map(m =>
-            `<button type="button" class="rc-mood${rcMood===m?" on":""}" data-mood="${m}" title="${{happy:"开心",neutral:"平静",frustrated:"郁闷",tilted:"上头"}[m]}">${{happy:"😊",neutral:"😐",frustrated:"😤",tilted:"🤯"}[m]}</button>`
+          ${MOODS_8.map(([m,emoji,label]) =>
+            `<button type="button" class="rc-mood${rcMood===m?" on":""}" data-mood="${m}" title="${label}">${emoji}<small>${label}</small></button>`
+          ).join("")}
+        </div>
+        <div class="rc-feelings">
+          <div class="rc-sub-label">感受 (可多选)</div>
+          ${FEELINGS.map(f =>
+            `<button type="button" class="rc-feeling${rcFeelings.has(f)?" on":""}" data-feeling="${f}">${esc(f)}</button>`
+          ).join("")}
+        </div>
+        <div class="rc-rating">
+          <span class="rc-sub-label">本场自评</span>
+          ${[1,2,3,4,5].map(n =>
+            `<button type="button" class="rc-star${rcRating>=n?" on":""}" data-rating="${n}" title="${n} 星">★</button>`
           ).join("")}
         </div>
         <textarea class="rc-text" placeholder="复盘这局: 关键时刻, 失误点, 队友配合, 任何感受...">${esc(rcText)}</textarea>
@@ -829,11 +994,20 @@ async function expandHistoryItem(gid){
 async function saveGameRecap(gid, panel){
   const moodBtn = panel.querySelector(".rc-mood.on");
   const mood = moodBtn ? moodBtn.dataset.mood : "";
+  const feelings = Array.from(panel.querySelectorAll(".rc-feeling.on"))
+                        .map(b => b.dataset.feeling);
+  const ratingBtn = panel.querySelector(".rc-star.on:last-of-type");
+  // 简单: 取最后一个高亮的 star 的 data-rating (因为亮的是 1..N 连续)
+  let self_rating = 0;
+  panel.querySelectorAll(".rc-star.on").forEach(b => {
+    const n = parseInt(b.dataset.rating, 10);
+    if(n > self_rating) self_rating = n;
+  });
   const text = (panel.querySelector(".rc-text").value || "").trim();
   const tagsRaw = (panel.querySelector(".rc-tags").value || "").trim();
   const tags = tagsRaw.split(/[\s\/,，、]+/).filter(Boolean);
   const contribute = !!panel.querySelector(".rc-contrib-cb")?.checked;
-  if(!mood && !text && !tags.length){
+  if(!mood && !text && !tags.length && !feelings.length && !self_rating){
     panel.querySelector(".rc-status").textContent = "请至少填一项";
     return;
   }
@@ -845,7 +1019,8 @@ async function saveGameRecap(gid, panel){
     const r = await fetch("/api/game/recap", {
       method: "POST",
       headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({gid, mood, free_text: text, tags, contribute}),
+      body: JSON.stringify({gid, mood, free_text: text, tags, feelings,
+                            self_rating: self_rating || null, contribute}),
     });
     const j = await r.json();
     if(j.ok){
@@ -895,9 +1070,9 @@ function bindMatchDrawer(){
       drawer.classList.contains("collapsed") ? "1" : "0");
   });
   // 抽屉里的点击事件: 历史 item 展开/折叠, 展开后的 mate 行 → 复用 openMateModal,
-  // 复盘 mood 按钮切换, 复盘保存按钮
+  // 复盘 mood / 心情 / 评分 按钮切换, 复盘保存按钮
   list.addEventListener("click", e => {
-    // 复盘 mood 按钮 (高优先级)
+    // mood 单选
     const mb = e.target.closest(".rc-mood");
     if(mb){
       e.stopPropagation();
@@ -906,7 +1081,28 @@ function bindMatchDrawer(){
       mb.classList.add("on");
       return;
     }
-    // 复盘保存按钮
+    // feelings 多选
+    const fb = e.target.closest(".rc-feeling");
+    if(fb){
+      e.stopPropagation();
+      fb.classList.toggle("on");
+      return;
+    }
+    // rating 星: 点 N 星 → 1..N 全亮 (单击取消同一星 = 清零)
+    const rb = e.target.closest(".rc-star");
+    if(rb){
+      e.stopPropagation();
+      const panel = rb.closest(".md-recap");
+      const n = parseInt(rb.dataset.rating, 10);
+      const wasOn = rb.classList.contains("on");
+      const wasLast = !rb.nextElementSibling || !rb.nextElementSibling.classList.contains("on");
+      panel.querySelectorAll(".rc-star").forEach(b => {
+        const k = parseInt(b.dataset.rating, 10);
+        b.classList.toggle("on", (wasOn && wasLast) ? false : (k <= n));
+      });
+      return;
+    }
+    // 保存按钮
     const sb = e.target.closest(".rc-save");
     if(sb){
       e.stopPropagation();

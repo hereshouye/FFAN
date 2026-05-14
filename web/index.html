@@ -119,6 +119,24 @@
       <div class="modal-hint">提示: Cmd/Ctrl+Enter 也能保存</div>
     </div>
 
+    <!-- 快测人格 (生成 5 轴心理画像) -->
+    <div class="modal-section quiz-section">
+      <div class="lbl">
+        🧪 快测人格 <span id="quiz-progress" class="quiz-progress">未答</span>
+        <button class="quiz-toggle" id="quiz-toggle" title="展开/折叠快测">展开 ▼</button>
+      </div>
+      <div class="quiz-body" id="quiz-body" hidden>
+        <div class="quiz-hint">回答几题 (不必全答) 即可分出 TA 的 5 轴画像. 答得越多越准.</div>
+        <div class="quiz-questions" id="quiz-questions"></div>
+        <div class="quiz-axes" id="quiz-axes" hidden></div>
+        <div class="quiz-actions">
+          <button class="btn" id="quiz-save">💾 保存 axes</button>
+          <button class="btn" id="quiz-clear">清空答题</button>
+          <span class="quiz-status" id="quiz-status"></span>
+        </div>
+      </div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn" id="modal-cancel">取消</button>
       <button class="btn primary" id="modal-save">保存</button>

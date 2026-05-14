@@ -787,7 +787,113 @@ def _read_match_history(limit=30):
     return out
 
 
-_RECAP_MOODS = {"happy", "neutral", "frustrated", "tilted"}
+_RECAP_MOODS = {
+    "happy", "satisfied", "excited", "neutral",          # 正面 + 中性
+    "tired", "frustrated", "angry", "tilted",            # 负面
+}
+_RECAP_FEELINGS = {
+    "翻盘", "被坑", "装备成型", "操作秀",
+    "队友给力", "队友拖后腿", "对面太强", "我太菜",
+    "时间紧迫", "顺风", "节奏",
+}
+
+
+# ---------------------------------------------------------------------------
+# 快速人格测试 (8 题 → 5 轴 axes)
+# 用户在 mate modal 里答, 几秒钟生成心理画像. 答几题就出几轴, 不强制全答.
+# ---------------------------------------------------------------------------
+QUICK_QUIZ = [
+    {
+        "id": "q1", "text": "这位玩家连输 3 局后最可能:",
+        "options": [
+            {"id": "a", "text": "关游戏冷静一下",  "axes": {"tilt_profile": "compartmentalized"}},
+            {"id": "b", "text": "立刻再开一局找回场子", "axes": {"tilt_profile": "short_fuse"}},
+            {"id": "c", "text": "慢慢觉得不爽但继续打", "axes": {"tilt_profile": "slow_burn"}},
+            {"id": "d", "text": "无所谓, 接着打",   "axes": {"tilt_profile": "immune"}},
+        ],
+    },
+    {
+        "id": "q2", "text": "ARAM 阵容里没人打 carry, TA 会:",
+        "options": [
+            {"id": "a", "text": "硬切 carry 自己上",       "axes": {"competitive_style": "carry_seeker"}},
+            {"id": "b", "text": "保持本职, 配合团队节奏",   "axes": {"competitive_style": "team_player"}},
+            {"id": "c", "text": "做辅助, 让别人 carry",     "axes": {"competitive_style": "supporter"}},
+            {"id": "d", "text": "故意拿冷门英雄玩",         "axes": {"competitive_style": "challenger"}},
+        ],
+    },
+    {
+        "id": "q3", "text": "TA 玩 LoL 主要是为了:",
+        "options": [
+            {"id": "a", "text": "赢比赛 / 上分",     "axes": {"motivation_type": "competitive"}},
+            {"id": "b", "text": "跟朋友一起放松",     "axes": {"motivation_type": "social"}},
+            {"id": "c", "text": "钻研英雄和打法",     "axes": {"motivation_type": "mastery"}},
+            {"id": "d", "text": "下班解压消遣",       "axes": {"motivation_type": "escape"}},
+        ],
+    },
+    {
+        "id": "q4", "text": "队友刚送掉一波, TA 会:",
+        "options": [
+            {"id": "a", "text": "ping 一下解释 / 提示", "axes": {"comm_style": "caller"}},
+            {"id": "b", "text": "保持沉默继续打",       "axes": {"comm_style": "silent"}},
+            {"id": "c", "text": "在聊天框抱怨",         "axes": {"comm_style": "chatty", "tilt_profile": "short_fuse"}},
+            {"id": "d", "text": "想下波怎么挽回",       "axes": {"pressure_response": "analytical"}},
+        ],
+    },
+    {
+        "id": "q5", "text": "对线被对面单杀, TA 立刻:",
+        "options": [
+            {"id": "a", "text": "深呼吸冷静分析",       "axes": {"pressure_response": "analytical"}},
+            {"id": "b", "text": "想着把他单杀回来",     "axes": {"pressure_response": "aggressive"}},
+            {"id": "c", "text": "稳住, 该咋打咋打",     "axes": {"pressure_response": "calm"}},
+            {"id": "d", "text": "想 afk 一下休息",      "axes": {"pressure_response": "avoidance"}},
+        ],
+    },
+    {
+        "id": "q6", "text": "团队里 TA 更喜欢:",
+        "options": [
+            {"id": "a", "text": "下指令组织开团",   "axes": {"comm_style": "caller"}},
+            {"id": "b", "text": "听指挥跟着打",     "axes": {"comm_style": "reactive"}},
+            {"id": "c", "text": "互相调侃聊天",     "axes": {"comm_style": "chatty"}},
+            {"id": "d", "text": "专注打不爱说话",   "axes": {"comm_style": "silent"}},
+        ],
+    },
+    {
+        "id": "q7", "text": "拿到不熟英雄, TA 会:",
+        "options": [
+            {"id": "a", "text": "看技能上去边打边学", "axes": {"motivation_type": "mastery", "pressure_response": "calm"}},
+            {"id": "b", "text": "上去就 1A 试试",     "axes": {"pressure_response": "aggressive"}},
+            {"id": "c", "text": "想着玩玩看送了无所谓","axes": {"motivation_type": "escape"}},
+            {"id": "d", "text": "不送就行, 让队友 carry","axes": {"competitive_style": "supporter"}},
+        ],
+    },
+    {
+        "id": "q8", "text": "TA 上头时最像哪种:",
+        "options": [
+            {"id": "a", "text": "话突然变多, 抱怨 / 阴阳", "axes": {"tilt_profile": "short_fuse", "comm_style": "chatty"}},
+            {"id": "b", "text": "操作变得激进硬冲",         "axes": {"tilt_profile": "short_fuse", "pressure_response": "aggressive"}},
+            {"id": "c", "text": "沉默, 但能看出冷战",       "axes": {"tilt_profile": "slow_burn", "comm_style": "silent"}},
+            {"id": "d", "text": "看不出来, 心态超稳",       "axes": {"tilt_profile": "immune"}},
+        ],
+    },
+]
+
+
+def _compute_axes_from_quiz(answers: dict) -> dict:
+    """answers = {q_id: option_id}, 返回 {axis_name: value}.
+
+    规则: 每答一题, 把那个选项的 axes 字段累加到投票池. 每个轴取得票最多的值.
+    没答的轴留空.
+    """
+    from collections import Counter
+    votes = {}  # axis -> Counter
+    for q in QUICK_QUIZ:
+        choice = answers.get(q["id"])
+        if not choice: continue
+        opt = next((o for o in q["options"] if o["id"] == choice), None)
+        if not opt: continue
+        for axis, val in (opt.get("axes") or {}).items():
+            votes.setdefault(axis, Counter())[val] += 1
+    return {axis: c.most_common(1)[0][0] for axis, c in votes.items() if c}
 
 
 def _game_recap_path(gid):
@@ -801,15 +907,17 @@ def _load_game_recap(gid):
     except Exception: return None
 
 
-def _save_game_recap(gid, mood, free_text, tags):
+def _save_game_recap(gid, mood, free_text, tags, feelings=None, self_rating=None):
     p = _game_recap_path(gid)
     p.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "_v":          1,
+        "_v":          2,    # v2 = 加入 feelings + self_rating
         "_ts":         dt.datetime.now().isoformat(timespec="seconds"),
         "_patch":      CURRENT_PATCH or "",
         "gid":         int(gid) if str(gid).isdigit() else gid,
         "mood":        mood,
+        "feelings":    feelings or [],
+        "self_rating": self_rating,
         "free_text":   free_text,
         "tags":        tags,
         "updated_at":  dt.datetime.now().isoformat(timespec="seconds"),
@@ -818,7 +926,8 @@ def _save_game_recap(gid, mood, free_text, tags):
     return payload
 
 
-def _save_game_recap_contribution(gid, mood, free_text, tags):
+def _save_game_recap_contribution(gid, mood, free_text, tags,
+                                   feelings=None, self_rating=None):
     """脱敏 + 写到 data/contributed/recap_<gid>.json (每局只保留最新一份).
 
     用户重复编辑同一局复盘时, 不再积累 N 份历史版本.
@@ -872,9 +981,11 @@ def _save_game_recap_contribution(gid, mood, free_text, tags):
         "first_contributed_at":  first_ts or now,
         "context":               context,
         "recap": {
-            "mood":      mood,
-            "free_text": free_text,
-            "tags":      tags,
+            "mood":        mood,
+            "feelings":    feelings or [],
+            "self_rating": self_rating,
+            "free_text":   free_text,
+            "tags":        tags,
         },
     }
     canonical.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
@@ -2557,6 +2668,9 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/reports/"):
             return self._serve_report_file(path[len("/reports/"):])
 
+        if path == "/api/profile/quiz/questions":
+            self._send(200, {"questions": QUICK_QUIZ}); return
+
         if path == "/api/game_detail":
             gid = (params.get("gid") or "").strip()
             detail = _read_game_detail(gid) if gid else None
@@ -2596,6 +2710,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_report_config()
         if path == "/api/report/generate":
             return self._post_report_generate()
+
+        if path == "/api/profile/quiz":
+            return self._post_profile_quiz()
 
         self._send(404, {"err": "not found"})
 
@@ -2748,7 +2865,13 @@ class Handler(BaseHTTPRequestHandler):
         self._send(200, {"ok": True, "cleared": n})
 
     def _post_game_recap(self):
-        """保存对局复盘. body: {gid, mood, free_text, tags?, contribute?}"""
+        """保存对局复盘.
+
+        body: {gid, mood, free_text, tags?, feelings?, self_rating?, contribute?}
+          mood          单选: happy/satisfied/excited/neutral/tired/frustrated/angry/tilted
+          feelings      多选 array, 推荐用 _RECAP_FEELINGS 里的标签 (但允许自定义)
+          self_rating   1-5, 你对这把自己表现的打分
+        """
         try:
             length = int(self.headers.get("Content-Length", "0"))
             body = json.loads(self.rfile.read(length) or b"{}")
@@ -2763,23 +2886,35 @@ class Handler(BaseHTTPRequestHandler):
         free_text = (body.get("free_text") or "").strip()
         tags_raw  = body.get("tags") or []
         tags = [str(t).strip() for t in tags_raw if str(t).strip()][:10]
-        if not free_text and not mood and not tags:
+        feelings_raw = body.get("feelings") or []
+        feelings = [str(t).strip() for t in feelings_raw if str(t).strip()][:8]
+        self_rating = body.get("self_rating")
+        if self_rating is not None:
+            try:
+                self_rating = int(self_rating)
+                if not (1 <= self_rating <= 5): self_rating = None
+            except (TypeError, ValueError): self_rating = None
+        if not free_text and not mood and not tags and not feelings and self_rating is None:
             self._send(400, {"err": "复盘内容不能完全为空"}); return
         contribute = bool(body.get("contribute"))
 
         try:
-            payload = _save_game_recap(gid, mood, free_text, tags)
+            payload = _save_game_recap(gid, mood, free_text, tags,
+                                        feelings=feelings, self_rating=self_rating)
         except Exception as e:
             self._send(500, {"err": f"写入失败: {e}"}); return
 
         contributed_path = None
         if contribute:
             try:
-                contributed_path = _save_game_recap_contribution(gid, mood, free_text, tags)
+                contributed_path = _save_game_recap_contribution(
+                    gid, mood, free_text, tags,
+                    feelings=feelings, self_rating=self_rating)
             except Exception as e:
                 push_log(f"[contribute] recap 保存失败: {e}")
 
-        push_log(f"[recap] gid={gid} mood={mood or '-'} {len(free_text)}字"
+        push_log(f"[recap] gid={gid} mood={mood or '-'} feelings={len(feelings)} "
+                 + f"rating={self_rating or '-'} {len(free_text)}字"
                  + (" +contrib" if contributed_path else ""))
         self._send(200, {
             "ok":          True,
@@ -2903,6 +3038,55 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             self._send(500, {"err": str(e)}); return
         self._send(200, data, "text/html; charset=utf-8")
+
+    def _post_profile_quiz(self):
+        """根据用户在 mate modal 里答的 quiz, 计算 5 轴 axes 并写入 profile.psych.
+
+        body: {"puuid": str, "answers": {"q1":"a", "q2":"c", ...}}
+        返回: {"ok":true, "axes": {...}, "answered": N, "coverage": ["tilt_profile",...]}
+        """
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            body = json.loads(self.rfile.read(length) or b"{}")
+        except Exception as e:
+            self._send(400, {"err": f"bad json: {e}"}); return
+        puuid = (body.get("puuid") or "").strip()
+        answers = body.get("answers") or {}
+        if not puuid:
+            self._send(400, {"err": "需要 puuid"}); return
+        if not isinstance(answers, dict) or not answers:
+            self._send(400, {"err": "answers 必须是非空 dict"}); return
+
+        axes = _compute_axes_from_quiz(answers)
+        if not axes:
+            self._send(400, {"err": "没有有效答案 (检查 question id 是否对得上)"}); return
+
+        full = _load_full_profiles()
+        if full is None:
+            self._send(500, {"err": "profiles.json 读取失败"}); return
+        prof = full.get(puuid)
+        if not isinstance(prof, dict):
+            prof = dict(PROFILE_DEFAULTS); full[puuid] = prof
+        psych = prof.setdefault("psych", dict(prof.get("psych") or {}))
+        ax_in = psych.setdefault("axes", {})
+        ax_in.update(axes)
+        psych["axes_source"]     = "quick_quiz"
+        psych["axes_confidence"] = round(len(answers) / max(len(QUICK_QUIZ), 1), 2)
+        psych["axes_updated_at"] = dt.datetime.now().isoformat(timespec="seconds")
+        try:
+            _save_full_profiles(full)
+        except Exception as e:
+            self._send(500, {"err": f"写入失败: {e}"}); return
+
+        load_profiles()
+        push_log(f"[quiz] {puuid[:8]} 答 {len(answers)}/{len(QUICK_QUIZ)} 题 → axes {axes}")
+        self._send(200, {
+            "ok":       True,
+            "axes":     ax_in,
+            "answered": len(answers),
+            "total":    len(QUICK_QUIZ),
+            "coverage": list(axes.keys()),
+        })
 
     def _post_persona(self):
         """更新一个 puuid 的 persona.

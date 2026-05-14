@@ -1,0 +1,61 @@
+name: 训练数据贡献 / Training data contribution
+description: 通过此 issue 上传你导出的 ffan_contrib_*.json 帮助训练鹤哥模型
+title: "[贡献] "
+labels: ["contribution"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢愿意贡献训练数据帮助鹤哥变聪明 ❤️
+
+        **提交前请仔细阅读以下条款**. 所有勾选框均为**必勾**, 缺一不能提交.
+
+  - type: checkboxes
+    id: legal-consent
+    attributes:
+      label: "法律 / 隐私条款 (必勾)"
+      description: |
+        本贡献机制按 PIPL (个人信息保护法) 第 47 条 / GDPR Art.7 / Art.9 设计.
+      options:
+        - label: 我已完整阅读 [DISCLAIMER.md](../blob/main/DISCLAIMER.md) 与 [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md), 并同意全部条款
+          required: true
+        - label: 我**自愿**贡献本次数据, 无任何对价 / 承诺 / 补偿
+          required: true
+        - label: 我**对本数据享有合法权利**, 不含未授权第三方信息 (朋友真名 / 召唤师名 / 他人评价 / 他人 PUUID 等)
+          required: true
+        - label: 我已确认 JSON 中 PUUID 均为 sha256 hash, **无明文召唤师名 / 真名**
+          required: true
+        - label: 我**授予 FFAN 项目维护者**对本次数据**永久、不可撤销、免版税、非独占**的使用权 (仅用于 LoL 教练 AI 训练 / 衍生模型发布 / 学术研究)
+          required: true
+        - label: 我理解 GDPR/PIPL 下我可要求删除原始样本, 但**已基于该样本训练的模型权重无法回滚** (此为技术限制)
+          required: true
+        - label: 我不期望署名, 我的匿名 ID (`anon_id`) 仅用于内部去重, 不会公开
+          required: true
+
+  - type: input
+    id: anon-id
+    attributes:
+      label: 贡献者匿名 ID
+      description: 把面板"匿名 ID" 字段复制到这里 (16 位 hex). 用于去重, 不会公开关联到你.
+      placeholder: "例: a1b2c3d4e5f60718"
+    validations:
+      required: true
+
+  - type: textarea
+    id: json-paste
+    attributes:
+      label: 贡献 JSON 内容
+      description: |
+        把 `ffan_contrib_<ts>.json` 文件**直接拖到本评论框**上传 (推荐),
+        或粘贴 JSON 内容 (注意小于 GitHub 65535 字符限制).
+      placeholder: 在此处拖入文件, 或粘贴 JSON 字符串
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: 备注 (可选)
+      description: 哪一类反馈值得关注 / 鹤哥哪些场景表达不够好 / 任何你想说的
+    validations:
+      required: false

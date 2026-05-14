@@ -12,6 +12,12 @@
 
 所有历史版本: [Releases](https://github.com/hereshouye/FFAN/releases)
 
+**验证下载真伪** (防仿冒, 推荐做一次):
+```powershell
+Get-FileHash FFAN.exe -Algorithm SHA256
+```
+对比 [Release 页](https://github.com/hereshouye/FFAN/releases/latest) 显示的 `digest` 字段, 一致才是官方版本.
+
 ---
 
 ## 怎么用
@@ -47,12 +53,26 @@ python rankprobe_lite.py
 
 ---
 
+## 想 fork / 二次开发 / 重新打包?
+
+MIT 协议允许, 但**必须**:
+1. 改名 (不能继续叫 FFAN)
+2. 在 README 显著位置标注 "基于 FFAN: https://github.com/hereshouye/FFAN"
+3. 移除原作者的联系方式 / Issue 链接 — **不要把你衍生版的问题推给原作者**
+4. 自行承担衍生版引起的全部责任
+
+完整条款见 [CONTRIBUTING.md §1.5](CONTRIBUTING.md). 违反者原作者保留公开声明 "未经认可" 的权利。
+
+---
+
 ## 文档跳转
 
 | 想看什么 | 去哪 |
 |---|---|
 | 完整免责 / 隐私 / Riot 法律 | [DISCLAIMER.md](DISCLAIMER.md) |
 | AI 能做和不能做 | [BOUNDARIES.md](BOUNDARIES.md) |
+| 安全漏洞报告 | [SECURITY.md](SECURITY.md) |
+| 社区行为准则 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) |
 | 未来规划 / 训练数据闭环 | [ROADMAP.md](ROADMAP.md) |
 | 玩家画像 schema | [PROFILES.md](PROFILES.md) |
 | 教练 schema | [COACH.md](COACH.md) |

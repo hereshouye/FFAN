@@ -353,6 +353,37 @@ body.recap-mode .card:hover{opacity:1}
   transition:opacity .12s}
 .md-mate:hover .md-mate-edit{opacity:1}
 
+/* 复盘面板 (历史对局展开后) */
+.md-recap{margin-top:6px;padding:8px;border-top:1px dashed rgba(255,255,255,.06);
+  display:flex;flex-direction:column;gap:6px}
+.md-recap .rc-head{display:flex;align-items:center;gap:8px;
+  color:var(--phi);font-size:11px}
+.md-recap .rc-head b{font-weight:600}
+.md-recap .rc-updated{color:var(--dim);font-size:10px;margin-left:auto}
+.md-recap .rc-moods{display:flex;gap:4px}
+.md-recap .rc-mood{background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.1);border-radius:6px;
+  padding:3px 8px;cursor:pointer;font-size:14px;transition:all .15s}
+.md-recap .rc-mood:hover{background:rgba(72,209,209,.1);border-color:var(--teal)}
+.md-recap .rc-mood.on{background:rgba(72,209,209,.18);
+  border-color:var(--teal);box-shadow:0 0 0 1px var(--teal) inset}
+.md-recap .rc-text{width:100%;min-height:48px;max-height:120px;
+  background:rgba(13,11,26,.6);border:1px solid var(--line);
+  color:var(--txt);border-radius:6px;padding:6px 8px;
+  font-family:inherit;font-size:11px;resize:vertical}
+.md-recap .rc-text:focus{outline:none;border-color:var(--teal)}
+.md-recap .rc-tags{width:100%;background:rgba(13,11,26,.6);
+  border:1px solid var(--line);color:var(--txt);border-radius:6px;
+  padding:5px 8px;font-size:10px}
+.md-recap .rc-tags:focus{outline:none;border-color:var(--teal)}
+.md-recap .rc-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.md-recap .rc-contrib{display:inline-flex;align-items:center;gap:4px;
+  font-size:11px;color:var(--dim);cursor:pointer;user-select:none}
+.md-recap .rc-contrib input{cursor:pointer;accent-color:var(--teal);margin:0}
+.md-recap .rc-contrib:hover{color:var(--phi)}
+.md-recap .rc-save{font-size:11px;padding:4px 12px}
+.md-recap .rc-status{color:var(--teal);font-size:11px;margin-left:auto}
+
 /* 给底部抽屉腾出空间, 防止 search 栏遮挡 */
 body{padding-bottom:300px}
 .contrib-tab{bottom:300px}

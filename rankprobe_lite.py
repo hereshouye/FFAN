@@ -740,6 +740,76 @@ def _read_match_history(limit=30):
     return out
 
 
+_RECAP_MOODS = {"happy", "neutral", "frustrated", "tilted"}
+
+
+def _game_recap_path(gid):
+    return GAMES_DIR / str(gid) / "recap.json"
+
+
+def _load_game_recap(gid):
+    p = _game_recap_path(gid)
+    if not p.exists(): return None
+    try: return json.loads(p.read_text(encoding="utf-8"))
+    except Exception: return None
+
+
+def _save_game_recap(gid, mood, free_text, tags):
+    p = _game_recap_path(gid)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "_v":          1,
+        "_ts":         dt.datetime.now().isoformat(timespec="seconds"),
+        "_patch":      CURRENT_PATCH or "",
+        "gid":         int(gid) if str(gid).isdigit() else gid,
+        "mood":        mood,
+        "free_text":   free_text,
+        "tags":        tags,
+        "updated_at":  dt.datetime.now().isoformat(timespec="seconds"),
+    }
+    p.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return payload
+
+
+def _save_game_recap_contribution(gid, mood, free_text, tags):
+    """脱敏 + 写到 data/contributed/recap_<gid>_<ts>.json. 不含 puuid/真名."""
+    consent = _load_contrib_consent()
+    if (consent or {}).get("action") == "revoke":
+        return None
+    detail = _read_game_detail(gid) or {}
+    # 抽取游戏上下文 (训练时模型需要知道 "对什么样的局做的复盘")
+    my_mate = next((m for m in (detail.get("mates") or []) if m.get("is_me")), None) or {}
+    team_champs = [m.get("champion_name") for m in (detail.get("mates") or [])
+                   if m.get("champion_name")]
+    context = {
+        "gid":            int(gid) if str(gid).isdigit() else gid,
+        "queue_type":     detail.get("queue_type", ""),
+        "duration_s":     detail.get("duration_s", 0),
+        "is_winning":     detail.get("is_winning"),
+        "my_champ_name":  my_mate.get("champion_name", ""),
+        "team_champs":    team_champs,
+    }
+    CONTRIB_DIR.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "_v":       1,
+        "_ts":      dt.datetime.now().isoformat(timespec="seconds"),
+        "_patch":   CURRENT_PATCH or "",
+        "anon_id":  _anon_contributor_id(),
+        "kind":     "game_recap",
+        "context":  context,
+        "recap": {
+            "mood":      mood,
+            "free_text": free_text,
+            "tags":      tags,
+        },
+    }
+    ts = dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+    path = CONTRIB_DIR / f"recap_{gid}_{ts}.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
+                    encoding="utf-8")
+    return path
+
+
 def _read_game_detail(gid):
     """从 games/<gid>/eog.json 构造一份 mate-shaped 列表, 供历史对局编辑使用.
 
@@ -803,6 +873,7 @@ def _read_game_detail(gid):
         "queue_type":  eog.get("queueType") or "",
         "duration_s":  int(eog.get("gameLength") or 0),
         "mates":       mates,
+        "recap":       _load_game_recap(gid),    # 已有复盘随详情一起回前端
     }
 
 
@@ -2414,6 +2485,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(404, {"err": f"gid={gid} 无记录或 eog.json 缺失"}); return
             self._send(200, detail); return
 
+        if path == "/api/game/recap":
+            return self._get_game_recap()
+
         if path == "/stream":
             return self._stream()
 
@@ -2435,6 +2509,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_contribute_consent()
         if path == "/api/contribute/clear":
             return self._post_contribute_clear()
+
+        if path == "/api/game/recap":
+            return self._post_game_recap()
 
         self._send(404, {"err": "not found"})
 
@@ -2499,26 +2576,33 @@ class Handler(BaseHTTPRequestHandler):
         })
 
     # ---- 训练贡献 (opt-in, 用户主动) ----
+    def _list_contrib_files(self):
+        """所有 opt-in 贡献文件: feedback_*.json (教练点评反馈) + recap_*.json (对局复盘)"""
+        if not CONTRIB_DIR.exists(): return []
+        out = []
+        for pat in ("feedback_*.json", "recap_*.json"):
+            out.extend(CONTRIB_DIR.glob(pat))
+        return sorted(out)
+
     def _get_contribute_stats(self):
-        try:
-            files = sorted(CONTRIB_DIR.glob("feedback_*.json")) if CONTRIB_DIR.exists() else []
-        except Exception:
-            files = []
+        files = self._list_contrib_files()
+        n_feedback = sum(1 for f in files if f.name.startswith("feedback_"))
+        n_recap    = sum(1 for f in files if f.name.startswith("recap_"))
         consent = _load_contrib_consent()
         self._send(200, {
-            "pending":   len(files),
-            "consent":   consent,
-            "anon_id":   _anon_contributor_id(),
-            "dir":       str(CONTRIB_DIR),
-            "upload":    _contrib_upload_target(),
+            "pending":     len(files),
+            "by_kind":     {"feedback": n_feedback, "recap": n_recap},
+            "consent":     consent,
+            "anon_id":     _anon_contributor_id(),
+            "dir":         str(CONTRIB_DIR),
+            "upload":      _contrib_upload_target(),
         })
 
     def _get_contribute_export(self):
         """打包所有待贡献样本成单个 JSON, 直接 download."""
-        if not CONTRIB_DIR.exists():
-            self._send(200, {"bundle_v": 1, "items": []}); return
+        files = self._list_contrib_files()
         items = []
-        for p in sorted(CONTRIB_DIR.glob("feedback_*.json")):
+        for p in files:
             try:
                 items.append(json.loads(p.read_text(encoding="utf-8")))
             except Exception:
@@ -2573,12 +2657,62 @@ class Handler(BaseHTTPRequestHandler):
     def _post_contribute_clear(self):
         """清空待贡献样本 (用户已上传/不想再保留)."""
         n = 0
-        if CONTRIB_DIR.exists():
-            for p in list(CONTRIB_DIR.glob("feedback_*.json")):
-                try: p.unlink(); n += 1
-                except Exception: pass
+        for p in self._list_contrib_files():
+            try: p.unlink(); n += 1
+            except Exception: pass
         push_log(f"[contribute] 清空 {n} 条")
         self._send(200, {"ok": True, "cleared": n})
+
+    def _post_game_recap(self):
+        """保存对局复盘. body: {gid, mood, free_text, tags?, contribute?}"""
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            body = json.loads(self.rfile.read(length) or b"{}")
+        except Exception as e:
+            self._send(400, {"err": f"bad json: {e}"}); return
+        gid = str(body.get("gid") or "").strip()
+        if not gid:
+            self._send(400, {"err": "gid 必填"}); return
+        mood = (body.get("mood") or "").strip().lower() or None
+        if mood and mood not in _RECAP_MOODS:
+            self._send(400, {"err": f"mood 须为 {sorted(_RECAP_MOODS)} 之一"}); return
+        free_text = (body.get("free_text") or "").strip()
+        tags_raw  = body.get("tags") or []
+        tags = [str(t).strip() for t in tags_raw if str(t).strip()][:10]
+        if not free_text and not mood and not tags:
+            self._send(400, {"err": "复盘内容不能完全为空"}); return
+        contribute = bool(body.get("contribute"))
+
+        try:
+            payload = _save_game_recap(gid, mood, free_text, tags)
+        except Exception as e:
+            self._send(500, {"err": f"写入失败: {e}"}); return
+
+        contributed_path = None
+        if contribute:
+            try:
+                contributed_path = _save_game_recap_contribution(gid, mood, free_text, tags)
+            except Exception as e:
+                push_log(f"[contribute] recap 保存失败: {e}")
+
+        push_log(f"[recap] gid={gid} mood={mood or '-'} {len(free_text)}字"
+                 + (" +contrib" if contributed_path else ""))
+        self._send(200, {
+            "ok":          True,
+            "recap":       payload,
+            "contributed": bool(contributed_path),
+        })
+
+    def _get_game_recap(self):
+        gid = ""
+        if "?" in self.path:
+            qs = self.path.split("?", 1)[1]
+            for kv in qs.split("&"):
+                if kv.startswith("gid="): gid = kv[4:].strip()
+        if not gid:
+            self._send(400, {"err": "gid 必填"}); return
+        r = _load_game_recap(gid)
+        self._send(200, {"gid": gid, "recap": r})
 
     def _post_persona(self):
         """更新一个 puuid 的 persona.

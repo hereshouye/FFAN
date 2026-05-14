@@ -723,11 +723,90 @@ async function expandHistoryItem(gid){
         <span class="md-mate-edit">✏️ 编辑</span>
       </div>`;
     }).join("");
-    detailEl.innerHTML = `<div class="md-detail-hint">点击任意队友编辑画像 (写入 data/profiles.json)</div>${rows}`;
+    const recap = j.recap || null;
+    const rcMood = (recap && recap.mood) || "";
+    const rcText = (recap && recap.free_text) || "";
+    const rcTags = (recap && (recap.tags||[]).join(" / ")) || "";
+    const updated = recap && recap.updated_at ? `<span class="rc-updated">${esc(recap.updated_at.slice(0,16).replace("T"," "))} 已保存</span>` : "";
+    const recapHtml = `
+      <div class="md-recap" data-gid="${gid}">
+        <div class="rc-head">
+          <b>我的复盘</b>
+          ${updated}
+        </div>
+        <div class="rc-moods">
+          ${["happy","neutral","frustrated","tilted"].map(m =>
+            `<button type="button" class="rc-mood${rcMood===m?" on":""}" data-mood="${m}" title="${{happy:"开心",neutral:"平静",frustrated:"郁闷",tilted:"上头"}[m]}">${{happy:"😊",neutral:"😐",frustrated:"😤",tilted:"🤯"}[m]}</button>`
+          ).join("")}
+        </div>
+        <textarea class="rc-text" placeholder="复盘这局: 关键时刻, 失误点, 队友配合, 任何感受...">${esc(rcText)}</textarea>
+        <input class="rc-tags" type="text" placeholder="标签 (空格/斜杠分隔, 例: 决策延迟 / 信息差)" value="${esc(rcTags)}">
+        <div class="rc-actions">
+          <label class="rc-contrib" title="勾选: 这条复盘脱敏后另存一份到 data/contributed/, 你可一键导出贡献给训练集. 不勾就只是本地存档.">
+            <input type="checkbox" class="rc-contrib-cb"> 同时贡献到训练集
+          </label>
+          <button class="btn rc-save">保存</button>
+          <span class="rc-status"></span>
+        </div>
+      </div>`;
+    detailEl.innerHTML = `<div class="md-detail-hint">点击任意队友编辑画像 (写入 data/profiles.json). 下方可写本局复盘.</div>${rows}${recapHtml}`;
     const item = $(`.md-item[data-gid="${gid}"]`);
     if(item) item.classList.add("expanded");
   }catch(e){
     detailEl.innerHTML = `<div class="md-detail-err">网络错误: ${esc(e.message)}</div>`;
+  }
+}
+
+async function saveGameRecap(gid, panel){
+  const moodBtn = panel.querySelector(".rc-mood.on");
+  const mood = moodBtn ? moodBtn.dataset.mood : "";
+  const text = (panel.querySelector(".rc-text").value || "").trim();
+  const tagsRaw = (panel.querySelector(".rc-tags").value || "").trim();
+  const tags = tagsRaw.split(/[\s\/,，、]+/).filter(Boolean);
+  const contribute = !!panel.querySelector(".rc-contrib-cb")?.checked;
+  if(!mood && !text && !tags.length){
+    panel.querySelector(".rc-status").textContent = "请至少填一项";
+    return;
+  }
+  const saveBtn = panel.querySelector(".rc-save");
+  const status  = panel.querySelector(".rc-status");
+  saveBtn.disabled = true; saveBtn.textContent = "保存中...";
+  status.textContent = "";
+  try{
+    const r = await fetch("/api/game/recap", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({gid, mood, free_text: text, tags, contribute}),
+    });
+    const j = await r.json();
+    if(j.ok){
+      status.textContent = "已保存 ✓" + (j.contributed ? " + 已贡献" : "");
+      // 更新顶部时间戳显示
+      const head = panel.querySelector(".rc-head");
+      if(head && j.recap && j.recap.updated_at){
+        let upd = head.querySelector(".rc-updated");
+        if(!upd){
+          upd = document.createElement("span");
+          upd.className = "rc-updated";
+          head.appendChild(upd);
+        }
+        upd.textContent = `${j.recap.updated_at.slice(0,16).replace("T"," ")} 已保存`;
+      }
+      // 同步贡献面板计数
+      if(j.contributed) refreshContribStats();
+      // 首次勾选贡献时, 顺手写一条 grant consent
+      if(j.contributed){
+        fetch("/api/contribute/stats").then(r=>r.json()).then(s => {
+          if((s.consent||{}).action !== "grant") postContribConsent("grant");
+        }).catch(()=>{});
+      }
+    } else {
+      status.textContent = "失败: " + (j.err || "?");
+    }
+  }catch(e){
+    status.textContent = "网络错误: " + e.message;
+  }finally{
+    saveBtn.disabled = false; saveBtn.textContent = "保存";
   }
 }
 
@@ -746,8 +825,31 @@ function bindMatchDrawer(){
     localStorage.setItem("md_collapsed",
       drawer.classList.contains("collapsed") ? "1" : "0");
   });
-  // 抽屉里的点击事件: 历史 item 展开/折叠, 展开后的 mate 行 → 复用 openMateModal
+  // 抽屉里的点击事件: 历史 item 展开/折叠, 展开后的 mate 行 → 复用 openMateModal,
+  // 复盘 mood 按钮切换, 复盘保存按钮
   list.addEventListener("click", e => {
+    // 复盘 mood 按钮 (高优先级)
+    const mb = e.target.closest(".rc-mood");
+    if(mb){
+      e.stopPropagation();
+      const panel = mb.closest(".md-recap");
+      panel.querySelectorAll(".rc-mood").forEach(b => b.classList.remove("on"));
+      mb.classList.add("on");
+      return;
+    }
+    // 复盘保存按钮
+    const sb = e.target.closest(".rc-save");
+    if(sb){
+      e.stopPropagation();
+      const panel = sb.closest(".md-recap");
+      saveGameRecap(panel.dataset.gid, panel);
+      return;
+    }
+    // 复盘面板内任何输入框点击 → 不触发其它逻辑
+    if(e.target.closest(".md-recap")){
+      return;
+    }
+    // 队友卡片 → 打开 mate modal
     const mate = e.target.closest(".md-mate");
     if(mate){
       const gid = mate.dataset.gid;
@@ -756,6 +858,7 @@ function bindMatchDrawer(){
       if(m) openMateModal(m);
       return;
     }
+    // 历史 item 展开
     const item = e.target.closest(".md-item-history");
     if(item && !item.classList.contains("no-detail")){
       expandHistoryItem(item.dataset.gid);

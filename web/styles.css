@@ -99,7 +99,7 @@ main{flex:1;padding:14px 16px 90px;max-width:980px;margin:0 auto;width:100%}
 .modal-section .lbl{font-size:11px;color:var(--dim);letter-spacing:1px;
   text-transform:uppercase;margin-bottom:5px}
 .modal-current{background:#0a0817;border:1px solid var(--line);border-radius:6px;
-  padding:8px 10px;font-size:12px;color:var(--txt);max-height:140px;
+  padding:8px 10px;font-size:12px;color:var(--txt);max-height:38vh;
   overflow-y:auto;line-height:1.6}
 .modal-current .voice{color:var(--phi);white-space:pre-wrap;margin-bottom:6px;
   position:relative;padding-right:22px}
@@ -114,7 +114,7 @@ main{flex:1;padding:14px 16px 90px;max-width:980px;margin:0 auto;width:100%}
 .modal-current .peer .persona-del{top:1px}
 .modal-current .persona-del:hover{color:var(--bad);
   background:rgba(255,107,138,.12)}
-.modal textarea{width:100%;min-height:90px;background:var(--card2);
+.modal textarea{width:100%;min-height:120px;max-height:50vh;background:var(--card2);
   border:1px solid var(--line);border-radius:6px;padding:9px 11px;
   color:var(--txt);font-size:13px;font-family:inherit;resize:vertical;outline:none}
 .modal textarea:focus{border-color:var(--pri)}
@@ -376,10 +376,10 @@ body.recap-mode .card:hover{opacity:1}
 .md-recap .rc-mood:hover{background:rgba(72,209,209,.1);border-color:var(--teal)}
 .md-recap .rc-mood.on{background:rgba(72,209,209,.18);
   border-color:var(--teal);box-shadow:0 0 0 1px var(--teal) inset}
-.md-recap .rc-text{width:100%;min-height:48px;max-height:120px;
+.md-recap .rc-text{width:100%;min-height:80px;max-height:200px;
   background:rgba(13,11,26,.6);border:1px solid var(--line);
   color:var(--txt);border-radius:6px;padding:6px 8px;
-  font-family:inherit;font-size:11px;resize:vertical}
+  font-family:inherit;font-size:12px;line-height:1.5;resize:vertical}
 .md-recap .rc-text:focus{outline:none;border-color:var(--teal)}
 .md-recap .rc-tags{width:100%;background:rgba(13,11,26,.6);
   border:1px solid var(--line);color:var(--txt);border-radius:6px;

@@ -551,7 +551,15 @@ async function deletePersonaEntry(action, index){
   }
 }
 
-function closeMateModal(){
+function _modalHasUnsavedDraft(){
+  const ta = $("#modal-text");
+  return !!(ta && ta.value && ta.value.trim().length > 0);
+}
+
+function closeMateModal(force=false){
+  if(!force && _modalHasUnsavedDraft()){
+    if(!confirm("textarea 里还有未保存的内容, 确认放弃?")) return;
+  }
   $("#modal-bg").classList.remove("on");
   _modal_puuid = "";
   _modal_mate  = null;
@@ -560,7 +568,11 @@ function closeMateModal(){
 async function saveMatePersona(){
   if(!_modal_puuid) return;
   const text = $("#modal-text").value.trim();
-  if(!text){ closeMateModal(); return; }
+  if(!text){
+    // 之前空文本会静默关闭, 容易让人以为已保存. 改成提示并停留.
+    $("#modal-text").focus();
+    return;
+  }
   const kind = $$('input[name="kind"]').find(r => r.checked)?.value || "peer";
   const btn = $("#modal-save");
   btn.disabled = true; btn.textContent = "保存中...";
@@ -574,7 +586,9 @@ async function saveMatePersona(){
       const e = await resp.json().catch(()=>({err:"未知"}));
       alert("保存失败: " + (e.err || resp.status));
     } else {
-      closeMateModal();
+      // 已保存, 不再询问 (textarea 里还有内容不算未保存草稿)
+      $("#modal-text").value = "";
+      closeMateModal(true);
     }
   }catch(e){
     alert("网络错误: " + e);
@@ -659,7 +673,15 @@ function renderDrawerHandle(s){
   phase.textContent = (s && s.phase) || "—";
 }
 
-async function loadMatchHistory(){
+// 用户正在抽屉里看/编辑某局时, 跳过自动刷新 — 否则 innerHTML 重写会清掉
+// 已展开的复盘面板, 包括正在输入的文字 (用户反馈过的 bug).
+function _drawerIsBusy(){
+  return !!document.querySelector(".md-item-history.expanded");
+}
+
+async function loadMatchHistory(opts){
+  // 自动调用 (无 opts) 时尊重 busy 守卫; 用户手动操作传 {force:true} 绕过
+  if(!(opts && opts.force) && _drawerIsBusy()) return;
   try{
     const j = await fetch("/api/match_history?limit=30").then(r=>r.json());
     renderMatchHistory(j.items || []);

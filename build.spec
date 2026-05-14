@@ -38,6 +38,8 @@ a = Analysis(
     hiddenimports=[
         'cache_official_augments',
         'cache_hex_recommendations',
+        'llm_client',
+        'daily_report',
     ],
     hookspath=[],
     hooksconfig={},

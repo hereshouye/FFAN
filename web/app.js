@@ -938,10 +938,148 @@ function bindMatchDrawer(){
   loadMatchHistory();
 }
 
+/* ============ 战报导出 (template + AI) ============ */
+const _PRESETS = [
+  {name:"DeepSeek",  type:"openai_compat", endpoint:"https://api.deepseek.com",     model:"deepseek-chat"},
+  {name:"通义千问",   type:"openai_compat", endpoint:"https://dashscope.aliyuncs.com/compatible-mode", model:"qwen-plus"},
+  {name:"智谱 GLM",  type:"openai_compat", endpoint:"https://open.bigmodel.cn/api/paas/v4", model:"glm-4-plus"},
+  {name:"月之暗面",   type:"openai_compat", endpoint:"https://api.moonshot.cn",     model:"moonshot-v1-32k"},
+  {name:"Claude",    type:"anthropic",     endpoint:"https://api.anthropic.com",   model:"claude-sonnet-4-5"},
+  {name:"OpenAI",    type:"openai_compat", endpoint:"https://api.openai.com",      model:"gpt-4o-mini"},
+];
+
+function fillPreset(p){
+  $("#rm-type").value     = p.type;
+  $("#rm-endpoint").value = p.endpoint;
+  $("#rm-model").value    = p.model;
+  $("#rm-key").value      = "";   // 留空让用户填 key
+  $("#rm-key").focus();
+}
+
+async function loadReportConfig(){
+  try{
+    const j = await fetch("/api/report/config").then(r=>r.json());
+    if(j.configured){
+      const c = j.config || {};
+      $("#rm-type").value     = c.type     || "openai_compat";
+      $("#rm-endpoint").value = c.endpoint || "";
+      $("#rm-model").value    = c.model    || "";
+      $("#rm-key").placeholder = c.api_key ? `已配置 (${c.api_key})` : "sk-...";
+      // 留空时表示"沿用旧 key"
+    }
+  }catch(_){}
+}
+
+async function saveReportConfig(){
+  const body = {
+    type:     $("#rm-type").value,
+    endpoint: $("#rm-endpoint").value.trim(),
+    model:    $("#rm-model").value.trim(),
+    api_key:  $("#rm-key").value.trim(),     // 空 → 沿用旧
+    temperature: 0.7,
+  };
+  const st = $("#rm-config-status");
+  st.textContent = "保存中...";
+  st.classList.remove("err");
+  try{
+    const r = await fetch("/api/report/config", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    if(j.ok){
+      st.textContent = `已保存 ✓ key=${(j.config||{}).api_key||"?"}`;
+      $("#rm-key").value = "";
+      $("#rm-key").placeholder = `已配置 (${(j.config||{}).api_key||"?"})`;
+    } else {
+      st.classList.add("err");
+      st.textContent = "失败: " + (j.err || "?");
+    }
+  }catch(e){
+    st.classList.add("err");
+    st.textContent = "网络错误: " + e.message;
+  }
+}
+
+async function generateReport(){
+  const date = $("#rm-date").value;
+  const mode = ($$('input[name="rm-mode"]').find(r => r.checked) || {}).value || "plain";
+  if(!date){ alert("请选择日期"); return; }
+  const st = $("#rm-status");
+  const btn = $("#rm-generate");
+  st.textContent = mode === "ai" ? "调用 LLM 中, 30-90 秒..." : "生成中...";
+  st.classList.remove("err");
+  btn.disabled = true;
+  try{
+    const r = await fetch("/api/report/generate", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({date, mode}),
+    });
+    const j = await r.json();
+    if(j.ok){
+      st.textContent = `已生成: ${j.file}, 即将打开...`;
+      setTimeout(() => window.open(j.url, "_blank"), 400);
+    } else {
+      st.classList.add("err");
+      st.textContent = "失败: " + (j.err || "?");
+    }
+  }catch(e){
+    st.classList.add("err");
+    st.textContent = "网络错误: " + e.message;
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+async function openLastReport(){
+  try{
+    const j = await fetch("/api/report/list").then(r=>r.json());
+    const items = j.items || [];
+    if(!items.length){ alert("还没有生成过任何战报"); return; }
+    window.open(items[0].url, "_blank");
+  }catch(e){ alert("失败: " + e.message); }
+}
+
+function bindReportModal(){
+  const tab   = $("#report-tab");
+  const modal = $("#report-modal");
+  const cls   = $("#rm-close");
+  if(!tab || !modal) return;
+  tab.addEventListener("click", () => {
+    // 默认填昨天
+    const d = new Date(); d.setDate(d.getDate() - 1);
+    $("#rm-date").value = d.toISOString().slice(0,10);
+    // 渲染 presets 行
+    const pres = $("#rm-presets");
+    pres.hidden = false;
+    pres.innerHTML = "<div>预设 (一键填):</div>" +
+      _PRESETS.map((p,i) => `<button data-i="${i}">${esc(p.name)}</button>`).join("");
+    pres.querySelectorAll("button").forEach(b => {
+      b.addEventListener("click", () => fillPreset(_PRESETS[parseInt(b.dataset.i, 10)]));
+    });
+    loadReportConfig();
+    modal.classList.add("on");
+  });
+  cls.addEventListener("click", () => modal.classList.remove("on"));
+  modal.addEventListener("click", e => {
+    if(e.target.id === "report-modal") modal.classList.remove("on");
+  });
+  // 模式切换显示/隐藏 AI 配置区
+  document.addEventListener("change", e => {
+    if(e.target.name === "rm-mode"){
+      $("#rm-ai-config").hidden = (e.target.value !== "ai");
+    }
+  });
+  $("#rm-save-config").addEventListener("click", saveReportConfig);
+  $("#rm-generate").addEventListener("click", generateReport);
+  $("#rm-open-last").addEventListener("click", openLastReport);
+}
+
 /* 初始化 */
 bindCoachFeedback();
 bindContribPanel();
 bindMatchDrawer();
+bindReportModal();
 // 首次勾选"贡献"时自动写一条 grant consent (PIPL 取证用)
 document.addEventListener("change", e => {
   if(e.target && e.target.id === "coach-fb-contrib" && e.target.checked){

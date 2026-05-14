@@ -146,6 +146,66 @@
     placeholder="搜索英雄 / 海克斯名称..." />
 </div>
 
+<!-- 导出战报 -->
+<button class="report-tab" id="report-tab" title="导出每日战报">📊 战报</button>
+
+<!-- 战报配置/生成弹窗 -->
+<div class="report-modal" id="report-modal">
+  <div class="rm-card">
+    <div class="rm-head">
+      <b>导出每日战报</b>
+      <button class="rm-x" id="rm-close" title="关闭">✕</button>
+    </div>
+    <div class="rm-body">
+      <div class="rm-row">
+        <label>日期</label>
+        <input type="date" id="rm-date">
+      </div>
+      <div class="rm-row">
+        <label>模式</label>
+        <div class="rm-mode">
+          <label><input type="radio" name="rm-mode" value="plain" checked> 模板 (零成本/离线)</label>
+          <label><input type="radio" name="rm-mode" value="ai"> AI 点评 (需配置)</label>
+        </div>
+      </div>
+
+      <div class="rm-ai-config" id="rm-ai-config" hidden>
+        <div class="rm-row">
+          <label>API 类型</label>
+          <select id="rm-type">
+            <option value="openai_compat">OpenAI 兼容 (DeepSeek/Qwen/智谱/月之暗面/Together)</option>
+            <option value="anthropic">Anthropic Claude</option>
+          </select>
+        </div>
+        <div class="rm-row">
+          <label>Endpoint</label>
+          <input type="text" id="rm-endpoint" placeholder="例: https://api.deepseek.com  或  https://api.anthropic.com">
+        </div>
+        <div class="rm-row">
+          <label>Model</label>
+          <input type="text" id="rm-model" placeholder="例: deepseek-chat / qwen-plus / claude-sonnet-4-5">
+        </div>
+        <div class="rm-row">
+          <label>API Key</label>
+          <input type="password" id="rm-key" placeholder="sk-...">
+          <div class="rm-hint">只存 <code>data/llm_config.json</code> 本地, 不上传任何远端服务. data/ 目录 gitignored.</div>
+        </div>
+        <div class="rm-row">
+          <button class="btn" id="rm-save-config">💾 保存配置</button>
+          <span class="rm-config-status" id="rm-config-status"></span>
+        </div>
+      </div>
+
+      <div class="rm-actions">
+        <button class="btn primary" id="rm-generate">🚀 生成</button>
+        <button class="btn" id="rm-open-last">📂 打开最新</button>
+        <span class="rm-status" id="rm-status"></span>
+      </div>
+      <div class="rm-presets" id="rm-presets" hidden></div>
+    </div>
+  </div>
+</div>
+
 <!-- 训练贡献 (opt-in, 默认折叠) -->
 <button class="contrib-tab" id="contrib-tab" title="贡献到训练集"
   >💝 贡献 <span id="contrib-tab-n">0</span></button>

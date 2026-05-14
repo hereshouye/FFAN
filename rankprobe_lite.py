@@ -2550,6 +2550,13 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError: lim = 30
             self._send(200, {"items": _read_match_history(lim)}); return
 
+        if path == "/api/report/config":
+            return self._get_report_config()
+        if path == "/api/report/list":
+            return self._get_report_list()
+        if path.startswith("/reports/"):
+            return self._serve_report_file(path[len("/reports/"):])
+
         if path == "/api/game_detail":
             gid = (params.get("gid") or "").strip()
             detail = _read_game_detail(gid) if gid else None
@@ -2584,6 +2591,11 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/game/recap":
             return self._post_game_recap()
+
+        if path == "/api/report/config":
+            return self._post_report_config()
+        if path == "/api/report/generate":
+            return self._post_report_generate()
 
         self._send(404, {"err": "not found"})
 
@@ -2785,6 +2797,112 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, {"err": "gid 必填"}); return
         r = _load_game_recap(gid)
         self._send(200, {"gid": gid, "recap": r})
+
+    # ---- 战报生成 (template + AI) ----
+    def _get_report_config(self):
+        try:
+            from llm_client import load_config, masked
+            cfg = load_config()
+            self._send(200, {
+                "configured": bool(cfg.get("api_key")),
+                "config":     masked(cfg) if cfg else {},
+            })
+        except Exception as e:
+            self._send(500, {"err": str(e)})
+
+    def _post_report_config(self):
+        """保存 LLM 配置到 data/llm_config.json. 永远不上传, key 不出本机."""
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            body = json.loads(self.rfile.read(length) or b"{}")
+        except Exception as e:
+            self._send(400, {"err": f"bad json: {e}"}); return
+        # 接受字段: type / endpoint / model / api_key / temperature / preset_name
+        # 如果传 api_key="*" 或空 → 保留旧的 (前端用占位符避免显示真 key)
+        try:
+            from llm_client import load_config, save_config
+            old = load_config()
+            new = {
+                "preset_name": (body.get("preset_name") or "").strip(),
+                "type":        (body.get("type") or "openai_compat").strip().lower(),
+                "endpoint":    (body.get("endpoint") or "").strip(),
+                "model":       (body.get("model") or "").strip(),
+                "temperature": float(body.get("temperature", 0.7)),
+            }
+            api_key = (body.get("api_key") or "").strip()
+            if api_key and not api_key.startswith("***"):
+                new["api_key"] = api_key
+            else:
+                new["api_key"] = old.get("api_key", "")
+            new["updated_at"] = dt.datetime.now().isoformat(timespec="seconds")
+            save_config(new)
+            push_log(f"[report] LLM 配置已存 ({new['type']} · {new['model']})")
+            from llm_client import masked
+            self._send(200, {"ok": True, "config": masked(new)})
+        except Exception as e:
+            self._send(500, {"err": f"保存失败: {e}"})
+
+    def _get_report_list(self):
+        reports_dir = DATA_DIR / "reports"
+        out = []
+        if reports_dir.exists():
+            for p in sorted(reports_dir.glob("daily_*.html"), reverse=True):
+                stat = p.stat()
+                # daily_YYYY-MM-DD.html
+                m = re.match(r"daily_(\d{4}-\d{2}-\d{2})\.html", p.name)
+                date_str = m.group(1) if m else ""
+                out.append({
+                    "name": p.name, "date": date_str,
+                    "size": stat.st_size,
+                    "ts":   dt.datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
+                    "url":  f"/reports/{p.name}",
+                })
+        self._send(200, {"items": out})
+
+    def _post_report_generate(self):
+        """body: {date: "YYYY-MM-DD", mode: "plain"|"ai"}"""
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            body = json.loads(self.rfile.read(length) or b"{}")
+        except Exception as e:
+            self._send(400, {"err": f"bad json: {e}"}); return
+        date = (body.get("date") or "").strip()
+        mode = (body.get("mode") or "plain").strip().lower()
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+            self._send(400, {"err": "date 格式必须 YYYY-MM-DD"}); return
+        if mode not in ("plain", "ai"):
+            self._send(400, {"err": "mode 必须是 plain 或 ai"}); return
+        try:
+            # tools/ 已在 sys.path (开头处)
+            import daily_report
+            push_log(f"[report] 生成 {date} · {mode} ...")
+            out = daily_report.generate(date, mode)
+            push_log(f"[report] 完成 → {out.name}")
+            self._send(200, {
+                "ok":   True,
+                "file": out.name,
+                "url":  f"/reports/{out.name}",
+                "mode": mode,
+                "date": date,
+            })
+        except ValueError as e:
+            self._send(400, {"err": str(e)})
+        except Exception as e:
+            push_log(f"[report] 失败: {type(e).__name__}: {e}")
+            self._send(500, {"err": f"{type(e).__name__}: {e}"})
+
+    def _serve_report_file(self, name):
+        # 安全: 只允许 daily_YYYY-MM-DD.html 这种文件名, 防路径穿越
+        if not re.match(r"^daily_\d{4}-\d{2}-\d{2}\.html$", name):
+            self._send(403, {"err": "forbidden filename"}); return
+        p = DATA_DIR / "reports" / name
+        if not p.exists():
+            self._send(404, {"err": "not found"}); return
+        try:
+            data = p.read_bytes()
+        except Exception as e:
+            self._send(500, {"err": str(e)}); return
+        self._send(200, data, "text/html; charset=utf-8")
 
     def _post_persona(self):
         """更新一个 puuid 的 persona.

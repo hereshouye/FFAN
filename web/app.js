@@ -605,6 +605,86 @@ function clearQuiz(){
   $("#quiz-status").textContent = "";
 }
 
+function exportQuiz(){
+  if(!_modal_puuid || !_modal_mate){
+    alert("先在 modal 里选一个队友"); return;
+  }
+  const name = _modal_mate.name || "玩家";
+  const url = `/api/profile/quiz/export?puuid=${encodeURIComponent(_modal_puuid)}&name=${encodeURIComponent(name)}`;
+  // 让浏览器直接下载 (后端带了 Content-Disposition: attachment)
+  const a = document.createElement("a");
+  a.href = url; a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => a.remove(), 1000);
+  const s = $("#quiz-status");
+  s.classList.remove("err");
+  s.textContent = "已生成问卷 HTML, 发给朋友打开即可";
+}
+
+async function importQuiz(file){
+  if(!_modal_puuid){ alert("先在 modal 里选一个队友"); return; }
+  if(!file) return;
+  const status = $("#quiz-status");
+  status.classList.remove("err");
+  status.textContent = "解析中...";
+  let payload;
+  try{
+    const text = await file.text();
+    payload = JSON.parse(text);
+  }catch(e){
+    status.classList.add("err");
+    status.textContent = "JSON 解析失败: " + e.message;
+    return;
+  }
+  if(payload._kind !== "ffan_quiz_export"){
+    status.classList.add("err");
+    status.textContent = "不是 FFAN 问卷文件 (缺 _kind)";
+    return;
+  }
+  const answers = payload.answers || {};
+  if(!Object.keys(answers).length){
+    status.classList.add("err");
+    status.textContent = "JSON 里 answers 是空的";
+    return;
+  }
+  // hint 校验只警告, 不阻断
+  const hint = payload.target_puuid_hint || "";
+  if(hint && !_modal_puuid.startsWith(hint)){
+    if(!confirm(`这份答卷原本是给 puuid 前缀 ${hint} 的人 (target_name="${payload.target_name||"?"}"), 当前 modal 是另一个人. 仍然导入到这个人?`)){
+      status.textContent = "已取消";
+      return;
+    }
+  }
+  // 先把答案灌进 UI 让用户看到
+  Object.keys(_quizAnswers).forEach(k => delete _quizAnswers[k]);
+  Object.assign(_quizAnswers, answers);
+  renderQuiz();
+  // 然后 POST 给后端写入 axes
+  try{
+    const r = await fetch("/api/profile/quiz/import", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        puuid: _modal_puuid,
+        answers,
+        target_puuid_hint: hint,
+        filled_by: payload.filled_by || "",
+      }),
+    });
+    const j = await r.json();
+    if(j.ok){
+      status.textContent = `已导入 (${j.answered}/${j.total} 题, 命中 ${j.coverage.length} 轴${payload.filled_by?", 由 "+payload.filled_by+" 填":""})`;
+      renderQuizAxes(j.axes);
+    } else {
+      status.classList.add("err");
+      status.textContent = "导入失败: " + (j.err || "?");
+    }
+  }catch(e){
+    status.classList.add("err");
+    status.textContent = "网络错误: " + e.message;
+  }
+}
+
 function openMateModal(mate){
   if(!mate || !mate.puuid){ return; }
   _modal_puuid = mate.puuid;
@@ -746,6 +826,12 @@ $("#quiz-questions").addEventListener("change", e => {
 });
 $("#quiz-save").addEventListener("click", saveQuiz);
 $("#quiz-clear").addEventListener("click", clearQuiz);
+$("#quiz-export").addEventListener("click", exportQuiz);
+$("#quiz-import").addEventListener("click", () => $("#quiz-import-file").click());
+$("#quiz-import-file").addEventListener("change", e => {
+  const f = e.target.files && e.target.files[0];
+  if(f){ importQuiz(f); e.target.value = ""; }
+});
 // 模态框内删除按钮 (✕ on self_voice / 每条 peer_voice)
 $("#modal-current").addEventListener("click", e => {
   const btn = e.target.closest(".persona-del");

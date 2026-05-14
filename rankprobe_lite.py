@@ -799,8 +799,9 @@ _RECAP_FEELINGS = {
 
 
 # ---------------------------------------------------------------------------
-# 快速人格测试 (8 题 → 5 轴 axes)
+# 快速人格测试 (20 题 → 5 轴 axes)
 # 用户在 mate modal 里答, 几秒钟生成心理画像. 答几题就出几轴, 不强制全答.
+# 也可导出 HTML 让朋友自己答, 再导入 JSON.
 # ---------------------------------------------------------------------------
 QUICK_QUIZ = [
     {
@@ -875,6 +876,114 @@ QUICK_QUIZ = [
             {"id": "d", "text": "看不出来, 心态超稳",       "axes": {"tilt_profile": "immune"}},
         ],
     },
+    {
+        "id": "q9", "text": "凌晨 1 点 TA 还在打 ARAM, 大概率是因为:",
+        "options": [
+            {"id": "a", "text": "白天忙, 只能熬夜放松", "axes": {"motivation_type": "escape"}},
+            {"id": "b", "text": "跟群友约着开黑停不下来", "axes": {"motivation_type": "social"}},
+            {"id": "c", "text": "试新英雄手感 / 练肌肉记忆", "axes": {"motivation_type": "mastery"}},
+            {"id": "d", "text": "上分上头, 输了不甘心", "axes": {"motivation_type": "competitive", "tilt_profile": "slow_burn"}},
+        ],
+    },
+    {
+        "id": "q10", "text": "团战即将开打, TA 第一反应是:",
+        "options": [
+            {"id": "a", "text": "ping 集合点 + 报技能", "axes": {"comm_style": "caller", "pressure_response": "analytical"}},
+            {"id": "b", "text": "找好位置等队友先手",   "axes": {"pressure_response": "calm", "competitive_style": "team_player"}},
+            {"id": "c", "text": "直接冲, 抢人头",       "axes": {"pressure_response": "aggressive", "competitive_style": "carry_seeker"}},
+            {"id": "d", "text": "稍微往后撤一点观察",   "axes": {"pressure_response": "avoidance"}},
+        ],
+    },
+    {
+        "id": "q11", "text": "BP 阶段 TA 抢到的英雄被队友想要, TA 会:",
+        "options": [
+            {"id": "a", "text": "直接换给队友, 自己挑别的", "axes": {"competitive_style": "supporter", "comm_style": "reactive"}},
+            {"id": "b", "text": "解释这把更适合自己玩",       "axes": {"comm_style": "caller"}},
+            {"id": "c", "text": "不换, 继续锁",                 "axes": {"competitive_style": "challenger", "comm_style": "silent"}},
+            {"id": "d", "text": "看队友态度, 互相调侃后再说",  "axes": {"comm_style": "chatty", "motivation_type": "social"}},
+        ],
+    },
+    {
+        "id": "q12", "text": "一波团灭, 等复活的 10 秒里 TA 通常:",
+        "options": [
+            {"id": "a", "text": "在思考刚才哪里没打好",   "axes": {"pressure_response": "analytical", "motivation_type": "mastery"}},
+            {"id": "b", "text": "在聊天框打字解释 / 吵架", "axes": {"comm_style": "chatty", "tilt_profile": "short_fuse"}},
+            {"id": "c", "text": "啥都不想, 等下波",         "axes": {"tilt_profile": "compartmentalized", "comm_style": "silent"}},
+            {"id": "d", "text": "考虑要不要投降",           "axes": {"pressure_response": "avoidance", "tilt_profile": "slow_burn"}},
+        ],
+    },
+    {
+        "id": "q13", "text": "TA 玩同一个英雄玩到第 100 次的时候:",
+        "options": [
+            {"id": "a", "text": "已经研究出冷门套路 / 出装", "axes": {"motivation_type": "mastery"}},
+            {"id": "b", "text": "厌了, 想换个新鲜的",         "axes": {"motivation_type": "escape", "competitive_style": "challenger"}},
+            {"id": "c", "text": "用来上分稳得一批",           "axes": {"motivation_type": "competitive", "competitive_style": "carry_seeker"}},
+            {"id": "d", "text": "看朋友想玩什么再说",         "axes": {"motivation_type": "social", "competitive_style": "team_player"}},
+        ],
+    },
+    {
+        "id": "q14", "text": "队友说 '辛苦了, 这把你 carry 了' 时, TA 会:",
+        "options": [
+            {"id": "a", "text": "回一句 '过奖过奖', 然后继续认真打", "axes": {"comm_style": "reactive", "motivation_type": "competitive"}},
+            {"id": "b", "text": "开始大段输出操作分析",                "axes": {"comm_style": "chatty", "motivation_type": "mastery"}},
+            {"id": "c", "text": "不回, 继续操作",                       "axes": {"comm_style": "silent"}},
+            {"id": "d", "text": "嘿嘿一下, 跟队友贫几句嘴",             "axes": {"comm_style": "chatty", "motivation_type": "social"}},
+        ],
+    },
+    {
+        "id": "q15", "text": "Reroll 转到一个 TA 讨厌的英雄, 反应是:",
+        "options": [
+            {"id": "a", "text": "硬着头皮研究怎么玩",     "axes": {"motivation_type": "mastery", "pressure_response": "analytical"}},
+            {"id": "b", "text": "跟队友换",                "axes": {"comm_style": "caller", "competitive_style": "team_player"}},
+            {"id": "c", "text": "上去随便玩玩, 送就送",   "axes": {"motivation_type": "escape", "tilt_profile": "immune"}},
+            {"id": "d", "text": "默默忍, 心里骂",          "axes": {"comm_style": "silent", "tilt_profile": "slow_burn"}},
+        ],
+    },
+    {
+        "id": "q16", "text": "对面 4 抓 1 把 TA 打死了, TA 会:",
+        "options": [
+            {"id": "a", "text": "ping warning 提醒队友绕开",  "axes": {"comm_style": "caller", "pressure_response": "calm"}},
+            {"id": "b", "text": "下次想方设法反 gank 回来",    "axes": {"pressure_response": "aggressive", "tilt_profile": "short_fuse"}},
+            {"id": "c", "text": "心态崩了, 这局打不下去",       "axes": {"pressure_response": "avoidance", "tilt_profile": "short_fuse"}},
+            {"id": "d", "text": "复盘下哪一步走错了",           "axes": {"pressure_response": "analytical", "motivation_type": "mastery"}},
+        ],
+    },
+    {
+        "id": "q17", "text": "TA 看 S 赛 / LPL 比赛吗:",
+        "options": [
+            {"id": "a", "text": "每场都追, 顺便记选手出装", "axes": {"motivation_type": "mastery", "competitive_style": "carry_seeker"}},
+            {"id": "b", "text": "看, 主要图个热闹",         "axes": {"motivation_type": "social"}},
+            {"id": "c", "text": "偶尔看决赛 / 重要场",       "axes": {"motivation_type": "competitive"}},
+            {"id": "d", "text": "不看, 只打不看",             "axes": {"motivation_type": "escape"}},
+        ],
+    },
+    {
+        "id": "q18", "text": "TA 第一血给到对面后, 通常会:",
+        "options": [
+            {"id": "a", "text": "回家整顿, 装备稳一手",   "axes": {"pressure_response": "calm", "competitive_style": "team_player"}},
+            {"id": "b", "text": "立马打回来 / 找机会单杀", "axes": {"pressure_response": "aggressive", "competitive_style": "carry_seeker"}},
+            {"id": "c", "text": "猥琐发育, 等装备",         "axes": {"pressure_response": "avoidance", "competitive_style": "supporter"}},
+            {"id": "d", "text": "调整心态, 看下波团",       "axes": {"pressure_response": "analytical", "tilt_profile": "compartmentalized"}},
+        ],
+    },
+    {
+        "id": "q19", "text": "如果当晚 5 连胜, TA 接下来更可能:",
+        "options": [
+            {"id": "a", "text": "见好就收, 关电脑睡觉",   "axes": {"tilt_profile": "compartmentalized", "motivation_type": "competitive"}},
+            {"id": "b", "text": "再来一把, 想冲 10 连",   "axes": {"motivation_type": "competitive", "competitive_style": "carry_seeker"}},
+            {"id": "c", "text": "叫朋友过来一起继续打",   "axes": {"motivation_type": "social", "comm_style": "chatty"}},
+            {"id": "d", "text": "换不熟的英雄玩玩",       "axes": {"motivation_type": "mastery", "competitive_style": "challenger"}},
+        ],
+    },
+    {
+        "id": "q20", "text": "TA 跟队友意见冲突时, 通常:",
+        "options": [
+            {"id": "a", "text": "据理力争, 把自己想法说清楚", "axes": {"comm_style": "caller", "motivation_type": "competitive"}},
+            {"id": "b", "text": "退一步, 听队友的",            "axes": {"comm_style": "reactive", "competitive_style": "team_player"}},
+            {"id": "c", "text": "嘴上不说, 心里有数",          "axes": {"comm_style": "silent", "tilt_profile": "slow_burn"}},
+            {"id": "d", "text": "用玩笑化解",                  "axes": {"comm_style": "chatty", "motivation_type": "social"}},
+        ],
+    },
 ]
 
 
@@ -894,6 +1003,208 @@ def _compute_axes_from_quiz(answers: dict) -> dict:
         for axis, val in (opt.get("axes") or {}).items():
             votes.setdefault(axis, Counter())[val] += 1
     return {axis: c.most_common(1)[0][0] for axis, c in votes.items() if c}
+
+
+def _build_quiz_export_html(questions: list, safe_name: str, hint: str) -> str:
+    """生成独立 HTML 问卷, 朋友本地用任何浏览器打开就能答, 全 offline.
+
+    选完后点 "生成 JSON" → 输出可下载/复制的 JSON, 用户拿到后导入 FFAN.
+    """
+    questions_json = json.dumps(questions, ensure_ascii=False)
+    return f"""<!doctype html>
+<html lang="zh"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FFAN 人格画像问卷 — 给 {safe_name}</title>
+<style>
+* {{ box-sizing: border-box; }}
+body {{ font: 14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+       max-width: 720px; margin: 0 auto; padding: 20px;
+       background: #0f1115; color: #d8dde6; }}
+header {{ background: linear-gradient(135deg,#6936b8 0%,#1e8fa3 100%);
+         padding: 20px; border-radius: 12px; margin-bottom: 20px; color: #fff; }}
+header h1 {{ margin: 0 0 8px 0; font-size: 20px; }}
+header .sub {{ opacity: .85; font-size: 13px; }}
+header .target {{ display: inline-block; background: rgba(255,255,255,.18);
+                 padding: 4px 10px; border-radius: 6px; margin-top: 8px;
+                 font-weight: 600; }}
+.q {{ background: #1a1d24; padding: 14px 16px; border-radius: 8px;
+     margin-bottom: 12px; border: 1px solid #2a2f3a; }}
+.q-text {{ font-weight: 600; margin-bottom: 10px; color: #e8ecf3; }}
+.q-text .idx {{ color: #b39ddb; margin-right: 6px; }}
+.opt {{ display: block; padding: 8px 12px; margin: 4px 0; cursor: pointer;
+       border-radius: 6px; background: #232730; transition: background .15s; }}
+.opt:hover {{ background: #2c3140; }}
+.opt input {{ margin-right: 8px; }}
+.opt.checked {{ background: #3d2f5e; border-left: 3px solid #b39ddb; }}
+.filler {{ background: #1a1d24; padding: 14px 16px; border-radius: 8px;
+          margin-bottom: 12px; border: 1px solid #2a2f3a; }}
+.filler label {{ display: block; margin-bottom: 6px; color: #b39ddb;
+                font-size: 13px; }}
+.filler input {{ width: 100%; padding: 8px 10px; background: #0f1115;
+                color: #d8dde6; border: 1px solid #2a2f3a; border-radius: 6px;
+                font: inherit; }}
+.actions {{ position: sticky; bottom: 12px; background: #1a1d24;
+           padding: 12px 16px; border-radius: 8px; margin-top: 16px;
+           border: 1px solid #2a2f3a; box-shadow: 0 4px 20px rgba(0,0,0,.4); }}
+.actions .progress {{ font-size: 12px; color: #8b93a3; margin-bottom: 8px; }}
+button {{ padding: 8px 16px; border: none; border-radius: 6px;
+         font: inherit; cursor: pointer; margin-right: 8px; }}
+.btn-primary {{ background: linear-gradient(135deg,#6936b8,#1e8fa3); color: #fff; }}
+.btn-primary:hover {{ opacity: .9; }}
+.btn-secondary {{ background: #2a2f3a; color: #d8dde6; }}
+.btn-secondary:hover {{ background: #353b48; }}
+.output {{ margin-top: 16px; }}
+.output textarea {{ width: 100%; min-height: 180px; background: #0f1115;
+                   color: #d8dde6; border: 1px solid #2a2f3a; border-radius: 6px;
+                   padding: 10px; font: 12px ui-monospace, Consolas, monospace; }}
+.tip {{ background: #1a2335; border-left: 3px solid #1e8fa3; padding: 10px 14px;
+       border-radius: 4px; margin: 10px 0; color: #a8c4d8; font-size: 13px; }}
+footer {{ text-align: center; color: #555c6b; margin: 20px 0;
+         font-size: 12px; }}
+footer a {{ color: #8b93a3; }}
+</style>
+</head><body>
+
+<header>
+  <h1>🧪 FFAN 人格画像问卷</h1>
+  <div class="sub">回答下面 20 题 (不必全答), 把生成的 JSON 发给朋友, TA 导入 FFAN 就能给你建心理画像.</div>
+  <div class="target">为 <b>{safe_name}</b> 填写</div>
+</header>
+
+<div class="tip">
+  💡 本问卷完全离线运行 — 你点的所有选项只存在浏览器里, 不会上传到任何服务器.<br>
+  填完点底部 <b>生成 JSON</b>, 把那段 JSON 复制 / 下载, 发给朋友即可.
+</div>
+
+<div class="filler">
+  <label>你是谁? (可填昵称, 可空)</label>
+  <input id="filled-by" type="text" placeholder="例: 鹤哥 / 张三 / 留空也行" maxlength="40">
+</div>
+
+<div id="questions"></div>
+
+<div class="actions">
+  <div class="progress" id="progress">未答 0 / 20 题</div>
+  <button class="btn-primary" id="btn-gen">📋 生成 JSON</button>
+  <button class="btn-secondary" id="btn-copy">复制到剪贴板</button>
+  <button class="btn-secondary" id="btn-dl">⬇️ 下载 .json</button>
+  <button class="btn-secondary" id="btn-clear">清空</button>
+</div>
+
+<div class="output" id="output" style="display:none">
+  <textarea id="json-out" readonly></textarea>
+</div>
+
+<footer>
+  FFAN — Local AI Coach for LoL ARAM ·
+  <a href="https://github.com/hereshouye/FFAN" target="_blank">github.com/hereshouye/FFAN</a>
+</footer>
+
+<script>
+const QUESTIONS = {questions_json};
+const TARGET_HINT = {json.dumps(hint)};
+const TARGET_NAME = {json.dumps(safe_name)};
+const answers = {{}};
+
+function esc(s) {{
+  return String(s).replace(/[&<>"']/g, c =>
+    ({{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}})[c]);
+}}
+
+function render() {{
+  const wrap = document.getElementById("questions");
+  wrap.innerHTML = QUESTIONS.map((q, i) => `
+    <div class="q" data-qid="${{q.id}}">
+      <div class="q-text"><span class="idx">${{i+1}}.</span>${{esc(q.text)}}</div>
+      ${{q.options.map(o => `
+        <label class="opt${{answers[q.id]===o.id?" checked":""}}">
+          <input type="radio" name="q-${{q.id}}" value="${{o.id}}"
+                 ${{answers[q.id]===o.id?"checked":""}}>${{esc(o.text)}}
+        </label>
+      `).join("")}}
+    </div>
+  `).join("");
+  updateProgress();
+}}
+
+function updateProgress() {{
+  const n = Object.keys(answers).length;
+  document.getElementById("progress").textContent =
+    n === 0 ? `未答 0 / ${{QUESTIONS.length}} 题` : `已答 ${{n}} / ${{QUESTIONS.length}} 题`;
+}}
+
+document.getElementById("questions").addEventListener("change", e => {{
+  if (e.target.name && e.target.name.startsWith("q-")) {{
+    const qid = e.target.name.slice(2);
+    answers[qid] = e.target.value;
+    e.target.closest(".q").querySelectorAll(".opt").forEach(l =>
+      l.classList.toggle("checked", l.querySelector("input").checked));
+    updateProgress();
+  }}
+}});
+
+function buildJson() {{
+  return {{
+    "_kind": "ffan_quiz_export",
+    "_v": 1,
+    "target_name": TARGET_NAME,
+    "target_puuid_hint": TARGET_HINT,
+    "filled_by": document.getElementById("filled-by").value.trim(),
+    "filled_at": new Date().toISOString().slice(0, 19),
+    "answers": answers
+  }};
+}}
+
+document.getElementById("btn-gen").addEventListener("click", () => {{
+  const n = Object.keys(answers).length;
+  if (n === 0) {{ alert("至少答 1 题"); return; }}
+  const json = JSON.stringify(buildJson(), null, 2);
+  document.getElementById("json-out").value = json;
+  document.getElementById("output").style.display = "block";
+  document.getElementById("output").scrollIntoView({{behavior:"smooth"}});
+}});
+
+document.getElementById("btn-copy").addEventListener("click", async () => {{
+  const ta = document.getElementById("json-out");
+  if (!ta.value) {{ alert("先点生成 JSON"); return; }}
+  try {{
+    await navigator.clipboard.writeText(ta.value);
+    alert("已复制. 把这段发给朋友即可.");
+  }} catch (_) {{
+    ta.select(); document.execCommand("copy");
+    alert("已复制 (fallback)");
+  }}
+}});
+
+document.getElementById("btn-dl").addEventListener("click", () => {{
+  const ta = document.getElementById("json-out");
+  if (!ta.value) {{
+    // 没生成就先生成
+    document.getElementById("btn-gen").click();
+    if (!ta.value) return;
+  }}
+  const blob = new Blob([ta.value], {{type:"application/json"}});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ffan_quiz_answer_${{TARGET_HINT}}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}});
+
+document.getElementById("btn-clear").addEventListener("click", () => {{
+  if (!Object.keys(answers).length) return;
+  if (!confirm("清空所有答题?")) return;
+  Object.keys(answers).forEach(k => delete answers[k]);
+  document.getElementById("output").style.display = "none";
+  document.getElementById("json-out").value = "";
+  render();
+}});
+
+render();
+</script>
+</body></html>"""
 
 
 def _game_recap_path(gid):
@@ -2670,6 +2981,8 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/profile/quiz/questions":
             self._send(200, {"questions": QUICK_QUIZ}); return
+        if path == "/api/profile/quiz/export":
+            return self._get_quiz_export(params)
 
         if path == "/api/game_detail":
             gid = (params.get("gid") or "").strip()
@@ -2713,6 +3026,8 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/profile/quiz":
             return self._post_profile_quiz()
+        if path == "/api/profile/quiz/import":
+            return self._post_profile_quiz_import()
 
         self._send(404, {"err": "not found"})
 
@@ -3087,6 +3402,86 @@ class Handler(BaseHTTPRequestHandler):
             "total":    len(QUICK_QUIZ),
             "coverage": list(axes.keys()),
         })
+
+    def _post_profile_quiz_import(self):
+        """导入朋友填的答卷 (导出 HTML 生成的 JSON), 直接计算 axes 写入.
+
+        Body JSON: {"puuid": str, "answers": {...}, "target_puuid_hint": str?}
+        逻辑跟 /api/profile/quiz 一致, 只是多了 hint 校验 + source 标记为 imported.
+        """
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            body = json.loads(self.rfile.read(length) or b"{}")
+        except Exception as e:
+            self._send(400, {"err": f"bad json: {e}"}); return
+        puuid = (body.get("puuid") or "").strip()
+        answers = body.get("answers") or {}
+        hint = (body.get("target_puuid_hint") or "").strip()
+        filled_by = (body.get("filled_by") or "").strip()[:40]
+        if not puuid:
+            self._send(400, {"err": "需要 puuid (当前 modal 的目标)"}); return
+        if not isinstance(answers, dict) or not answers:
+            self._send(400, {"err": "answers 必须是非空 dict"}); return
+        # hint 不匹配只警告, 不阻断 (用户可能故意拿别人的答卷套到这个人身上)
+        hint_ok = (not hint) or (puuid.startswith(hint))
+
+        axes = _compute_axes_from_quiz(answers)
+        if not axes:
+            self._send(400, {"err": "没有有效答案 (检查 question id)"}); return
+
+        full = _load_full_profiles()
+        if full is None:
+            self._send(500, {"err": "profiles.json 读取失败"}); return
+        prof = full.get(puuid)
+        if not isinstance(prof, dict):
+            prof = dict(PROFILE_DEFAULTS); full[puuid] = prof
+        psych = prof.setdefault("psych", dict(prof.get("psych") or {}))
+        ax_in = psych.setdefault("axes", {})
+        ax_in.update(axes)
+        psych["axes_source"]     = "imported_quiz"
+        psych["axes_confidence"] = round(len(answers) / max(len(QUICK_QUIZ), 1), 2)
+        psych["axes_updated_at"] = dt.datetime.now().isoformat(timespec="seconds")
+        if filled_by:
+            psych["axes_filled_by"] = filled_by
+        try:
+            _save_full_profiles(full)
+        except Exception as e:
+            self._send(500, {"err": f"写入失败: {e}"}); return
+
+        load_profiles()
+        push_log(f"[quiz/import] {puuid[:8]} 导入 {len(answers)} 题 → axes {axes} (by {filled_by or '?'}, hint_ok={hint_ok})")
+        self._send(200, {
+            "ok":       True,
+            "axes":     ax_in,
+            "answered": len(answers),
+            "total":    len(QUICK_QUIZ),
+            "coverage": list(axes.keys()),
+            "hint_ok":  hint_ok,
+        })
+
+    def _get_quiz_export(self, params):
+        """生成一份独立 HTML 问卷, 朋友打开就能答, 输出 JSON 让你导入.
+
+        ?puuid=XXX&name=YYY
+          puuid 用前 12 字符做 hint, 用于导入时弱匹配.
+          name 显示在问卷标题里, 让朋友知道在给谁画像.
+        """
+        from urllib.parse import unquote
+        puuid = unquote(params.get("puuid", "")).strip()
+        name  = unquote(params.get("name", "")).strip() or "这位玩家"
+        if not puuid:
+            self._send(400, {"err": "需要 puuid"}); return
+        hint = puuid[:12]
+        # 安全: name 用于 HTML 标题, 直接 escape 防注入
+        import html as _html
+        safe_name = _html.escape(name)[:40]
+        html_body = _build_quiz_export_html(QUICK_QUIZ, safe_name, hint)
+        # 文件名只用 ASCII (Content-Disposition 中文兼容性差)
+        fname = f"ffan_quiz_{hint}.html"
+        self._send(
+            200, html_body, "text/html; charset=utf-8",
+            extra={"Content-Disposition": f'attachment; filename="{fname}"'},
+        )
 
     def _post_persona(self):
         """更新一个 puuid 的 persona.

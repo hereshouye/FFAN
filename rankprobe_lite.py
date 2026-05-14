@@ -1360,6 +1360,13 @@ def _read_game_detail(gid):
                     "peer_voices": ((prof.get("persona") or {}).get("peer_voices") or []),
                 },
             },
+            # 历史抽屉里打开 modal 时 quiz 面板要靠这个回填 radio
+            "psych": {
+                "axes":          (prof.get("psych") or {}).get("axes") or {},
+                "axes_answers":  (prof.get("psych") or {}).get("axes_answers") or {},
+                "axes_source":   (prof.get("psych") or {}).get("axes_source") or "",
+                "axes_updated_at": (prof.get("psych") or {}).get("axes_updated_at") or "",
+            },
         })
     return {
         "gid":         int(gid) if str(gid).isdigit() else gid,
@@ -2144,6 +2151,13 @@ def _build_champ_select(api, session, my_puuid):
                     "peer_voices": ((profile.get("persona") or {})
                                     .get("peer_voices") or []),
                 },
+            },
+            # quiz 面板需要回填 radio 状态, 把 psych.axes + axes_answers 送给前端
+            "psych": {
+                "axes":          (profile.get("psych") or {}).get("axes") or {},
+                "axes_answers":  (profile.get("psych") or {}).get("axes_answers") or {},
+                "axes_source":   (profile.get("psych") or {}).get("axes_source") or "",
+                "axes_updated_at": (profile.get("psych") or {}).get("axes_updated_at") or "",
             },
         })
         if cid:
@@ -3386,6 +3400,9 @@ class Handler(BaseHTTPRequestHandler):
         psych = prof.setdefault("psych", dict(prof.get("psych") or {}))
         ax_in = psych.setdefault("axes", {})
         ax_in.update(axes)
+        # 存原始答案, 下次打开 modal 时回填 radio 状态 (修复"每次都未答"bug)
+        ans_in = psych.setdefault("axes_answers", {})
+        ans_in.update(answers)
         psych["axes_source"]     = "quick_quiz"
         psych["axes_confidence"] = round(len(answers) / max(len(QUICK_QUIZ), 1), 2)
         psych["axes_updated_at"] = dt.datetime.now().isoformat(timespec="seconds")
@@ -3439,6 +3456,9 @@ class Handler(BaseHTTPRequestHandler):
         psych = prof.setdefault("psych", dict(prof.get("psych") or {}))
         ax_in = psych.setdefault("axes", {})
         ax_in.update(axes)
+        # 存原始答案 (含导入), 修复"每次未答"问题
+        ans_in = psych.setdefault("axes_answers", {})
+        ans_in.update(answers)
         psych["axes_source"]     = "imported_quiz"
         psych["axes_confidence"] = round(len(answers) / max(len(QUICK_QUIZ), 1), 2)
         psych["axes_updated_at"] = dt.datetime.now().isoformat(timespec="seconds")
@@ -4605,6 +4625,12 @@ def load_demo_state():
                     "peer_voices": ((profile.get("persona") or {})
                                     .get("peer_voices") or []),
                 },
+            },
+            "psych": {
+                "axes":          (profile.get("psych") or {}).get("axes") or {},
+                "axes_answers":  (profile.get("psych") or {}).get("axes_answers") or {},
+                "axes_source":   (profile.get("psych") or {}).get("axes_source") or "",
+                "axes_updated_at": (profile.get("psych") or {}).get("axes_updated_at") or "",
             },
         })
         if cid: cids_arch.append(cid)

@@ -538,19 +538,19 @@ function updateQuizProgress(){
 
 async function openQuizPanel(){
   await loadQuizQuestions();
-  // 从已有 profile.psych.axes 反推: 没办法精确反推 answers, 只能展示当前 axes
-  const persona = ((_modal_mate||{}).profile||{}).persona || {};
-  // 注: persona 里没有 axes, axes 在 profile.psych 里 — 模态打开时 mate 对象不一定带
-  // 这里就先空答案让用户重新答 (或者后续从 STATE 读 mate.psych 也行)
   Object.keys(_quizAnswers).forEach(k => delete _quizAnswers[k]);
-  // 试着从 mate.psych 拿已有 axes (如果传过来)
+  // 从 mate.psych.axes_answers 回填已有答题 (现在后端会存 raw answers)
   const psych = (_modal_mate||{}).psych || ((_modal_mate||{}).profile||{}).psych || null;
+  if(psych && psych.axes_answers && typeof psych.axes_answers === "object"){
+    Object.assign(_quizAnswers, psych.axes_answers);
+  }
   if(psych && psych.axes){
     renderQuizAxes(psych.axes);
   } else {
     $("#quiz-axes").hidden = true;
   }
   renderQuiz();
+  updateQuizProgress();
   $("#quiz-body").hidden = false;
   $("#quiz-toggle").textContent = "折叠 ▲";
 }
@@ -589,6 +589,13 @@ async function saveQuiz(){
     if(j.ok){
       status.textContent = `已存 (${j.answered}/${j.total} 题, 命中 ${j.coverage.length} 轴)`;
       renderQuizAxes(j.axes);
+      // 同步内存里的快照, 这样本次会话内关闭 quiz 面板再打开仍能看到已答
+      if(_modal_mate){
+        _modal_mate.psych = _modal_mate.psych || {};
+        _modal_mate.psych.axes = j.axes;
+        _modal_mate.psych.axes_answers = Object.assign(
+          {}, _modal_mate.psych.axes_answers || {}, _quizAnswers);
+      }
     } else {
       status.classList.add("err");
       status.textContent = "失败: " + (j.err || "?");
@@ -675,6 +682,12 @@ async function importQuiz(file){
     if(j.ok){
       status.textContent = `已导入 (${j.answered}/${j.total} 题, 命中 ${j.coverage.length} 轴${payload.filled_by?", 由 "+payload.filled_by+" 填":""})`;
       renderQuizAxes(j.axes);
+      if(_modal_mate){
+        _modal_mate.psych = _modal_mate.psych || {};
+        _modal_mate.psych.axes = j.axes;
+        _modal_mate.psych.axes_answers = Object.assign(
+          {}, _modal_mate.psych.axes_answers || {}, answers);
+      }
     } else {
       status.classList.add("err");
       status.textContent = "导入失败: " + (j.err || "?");

@@ -33,6 +33,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import webbrowser
 from collections import deque
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -4762,6 +4763,24 @@ def main():
     srv = _Server(("0.0.0.0", PORT), Handler)
     push_log(f"[boot] HTTP 监听 http://127.0.0.1:{PORT}/"
              + ("  (DEMO 模式, 不连接 LCU)" if demo else ""))
+
+    # 自动弹浏览器到 FFAN 当前页. 三种方式可关闭:
+    #   1) --no-browser CLI 参数
+    #   2) PROBE_NO_BROWSER=1 环境变量
+    #   3) demo 模式下没 LCU, 也开 (用户演示时方便看 UI)
+    no_browser = ("--no-browser" in sys.argv) or os.environ.get("PROBE_NO_BROWSER") == "1"
+    if not no_browser:
+        url = f"http://127.0.0.1:{PORT}/"
+        def _open_delayed():
+            # 等 srv.serve_forever() 进入循环再弹, 否则极少数情况浏览器先到
+            time.sleep(0.6)
+            try:
+                webbrowser.open(url, new=2)  # new=2 = 新标签页 (如果可能)
+                push_log(f"[boot] 已弹浏览器 → {url}")
+            except Exception as e:
+                push_log(f"[boot] 自动开浏览器失败 ({e}), 请手动打开 {url}")
+        threading.Thread(target=_open_delayed, daemon=True, name="open-browser").start()
+
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

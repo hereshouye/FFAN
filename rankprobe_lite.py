@@ -708,15 +708,21 @@ def _read_match_history(limit=30):
         }
         # 从 eog.json 找我的参与信息 (best-effort, eog 不存在就跳过)
         eog_path = GAMES_DIR / str(gid) / "eog.json"
-        if me_puuid and eog_path.exists():
+        item["has_detail"] = eog_path.exists()
+        if eog_path.exists():
             try:
                 eog = json.loads(eog_path.read_text(encoding="utf-8"))
-                for p in (eog.get("participants") or []):
-                    if p.get("puuid") == me_puuid:
-                        item["my_champ_id"]   = p.get("champion_id")
-                        item["my_champ_name"] = (CHAMPIONS_BY_CID.get(p.get("champion_id")) or {}).get("name") or ""
-                        item["my_win"]        = (p.get("team_id") == item["win_team"]) if item["win_team"] else None
-                        break
+                # eog.json 格式: teams[].players[].puuid + championId + isLocalPlayer
+                for t in (eog.get("teams") or []):
+                    for p in (t.get("players") or []):
+                        is_me = (me_puuid and p.get("puuid") == me_puuid) or p.get("isLocalPlayer")
+                        if is_me:
+                            cid = p.get("championId") or 0
+                            item["my_champ_id"]   = cid
+                            item["my_champ_name"] = (CHAMPIONS_BY_CID.get(cid) or {}).get("name") or ""
+                            item["my_win"]        = bool(t.get("isWinningTeam"))
+                            break
+                    if item["my_win"] is not None: break
             except Exception:
                 pass
         # date string for grouping (优先用 ts, 其次 _ts)
@@ -732,6 +738,72 @@ def _read_match_history(limit=30):
             item["date"] = (ts_str or "")[:10]
         out.append(item)
     return out
+
+
+def _read_game_detail(gid):
+    """从 games/<gid>/eog.json 构造一份 mate-shaped 列表, 供历史对局编辑使用.
+
+    返回 {gid, ts, queue_name, win, mates: [...]}, 失败返回 None.
+    mate 字段与 _build_champ_select 的 mate 兼容, 这样前端可直接复用 openMateModal.
+    """
+    if not gid: return None
+    eog_path = GAMES_DIR / str(gid) / "eog.json"
+    if not eog_path.exists(): return None
+    try:
+        eog = json.loads(eog_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    teams = eog.get("teams") or []
+    # 找我所在的 team (isPlayerTeam 优先, 否则 isLocalPlayer 的 player 所在 teamId)
+    my_team = None
+    for t in teams:
+        if t.get("isPlayerTeam"):
+            my_team = t; break
+    if my_team is None:
+        for t in teams:
+            for p in (t.get("players") or []):
+                if p.get("isLocalPlayer"):
+                    my_team = t; break
+            if my_team: break
+    if my_team is None:
+        return None
+
+    mates = []
+    for idx, p in enumerate(my_team.get("players") or []):
+        puuid = p.get("puuid", "")
+        cid   = p.get("championId") or 0
+        ch    = CHAMPIONS_BY_CID.get(cid) or {}
+        # 真名优先从 PROFILES 的 nickname (用户已经手填的), 其次 LCU 返回的 riotIdGameName
+        prof  = PROFILES.get(puuid) or {}
+        name  = prof.get("nickname") or p.get("riotIdGameName") or p.get("summonerName") or "?"
+        mates.append({
+            "cell_id":       idx,                       # drawer 里点击靠 idx
+            "puuid":         puuid,
+            "is_me":         bool(p.get("isLocalPlayer")),
+            "name":          name,
+            "champion_id":   cid,
+            "champion_name": ch.get("name") or "",      # 修复 eog 里的 mojibake
+            "slot_label":    _slot_label(cid),
+            "profile": {
+                "tags":        prof.get("tags") or [],
+                "self_desc":   prof.get("self_desc") or "",
+                "peer_review": prof.get("peer_review") or "",
+                "habits":      prof.get("habits") or "",
+                "skill":       prof.get("skill") or "",
+                "persona": {
+                    "self_voice":  ((prof.get("persona") or {}).get("self_voice") or ""),
+                    "peer_voices": ((prof.get("persona") or {}).get("peer_voices") or []),
+                },
+            },
+        })
+    return {
+        "gid":         int(gid) if str(gid).isdigit() else gid,
+        "ts":          eog.get("endOfGameTimestamp") or "",
+        "is_winning":  bool(my_team.get("isWinningTeam")),
+        "queue_type":  eog.get("queueType") or "",
+        "duration_s":  int(eog.get("gameLength") or 0),
+        "mates":       mates,
+    }
 
 
 def _contrib_upload_target():
@@ -2334,6 +2406,13 @@ class Handler(BaseHTTPRequestHandler):
             try: lim = int(params.get("limit", "30"))
             except ValueError: lim = 30
             self._send(200, {"items": _read_match_history(lim)}); return
+
+        if path == "/api/game_detail":
+            gid = (params.get("gid") or "").strip()
+            detail = _read_game_detail(gid) if gid else None
+            if not detail:
+                self._send(404, {"err": f"gid={gid} 无记录或 eog.json 缺失"}); return
+            self._send(200, detail); return
 
         if path == "/stream":
             return self._stream()

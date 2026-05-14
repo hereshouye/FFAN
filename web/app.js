@@ -669,25 +669,74 @@ function renderMatchHistory(items){
       const resTxt = win === true ? "胜" : win === false ? "负" : "—";
       const champ  = it.my_champ_name || "?";
       const tsShort = (it.ts || "").slice(11,16);
-      html += `<div class="md-item" data-gid="${it.gid}">
+      const clickable = it.has_detail;
+      html += `<div class="md-item md-item-history${clickable ? "" : " no-detail"}" data-gid="${it.gid}" title="${clickable ? "点击展开队友, 可编辑画像" : "老对局无详情快照 (eog.json 缺失), 无法编辑"}">
         <img class="md-champ-ic" src="${it.my_champ_id ? champIcon(it.my_champ_id) : ''}" onerror="this.style.opacity=.2">
         <div class="md-meta">
           <div class="md-line1">
             <span class="md-champ">${esc(champ)}</span>
             <span class="md-queue">${esc(safeQueue(it.queue_name, it.queue_id))}</span>
+            ${clickable ? "" : `<span class="md-no-detail">无详情</span>`}
           </div>
           <div class="md-line2">${esc(tsShort)} · ${fmtDuration(it.duration_s)} · gid ${it.gid}</div>
         </div>
         <span class="md-result ${resCls}">${resTxt}</span>
-      </div>`;
+      </div>
+      <div class="md-detail" data-gid="${it.gid}" hidden></div>`;
     }
   }
   list.innerHTML = html;
 }
 
+async function expandHistoryItem(gid){
+  const detailEl = $(`.md-detail[data-gid="${gid}"]`);
+  if(!detailEl) return;
+  // 已展开 → 折叠
+  if(!detailEl.hidden){
+    detailEl.hidden = true;
+    detailEl.innerHTML = "";
+    const item = $(`.md-item[data-gid="${gid}"]`);
+    if(item) item.classList.remove("expanded");
+    return;
+  }
+  detailEl.innerHTML = `<div class="md-detail-loading">加载中...</div>`;
+  detailEl.hidden = false;
+  try{
+    const r = await fetch(`/api/game_detail?gid=${encodeURIComponent(gid)}`);
+    if(!r.ok){
+      const e = await r.json().catch(()=>({err:"未知"}));
+      detailEl.innerHTML = `<div class="md-detail-err">读取失败: ${esc(e.err || r.status)}</div>`;
+      return;
+    }
+    const j = await r.json();
+    _HISTORY_MATES[gid] = j.mates || [];     // 缓存供点击时取用
+    const rows = (j.mates || []).map((m, idx) => {
+      const isMe = m.is_me ? " 你" : "";
+      const personaCount = ((m.profile||{}).persona||{}).peer_voices||[];
+      const hasPersona = !!(((m.profile||{}).persona||{}).self_voice) || personaCount.length > 0;
+      return `<div class="md-mate" data-gid="${gid}" data-idx="${idx}">
+        <img class="md-mate-ic" src="${m.champion_id ? champIcon(m.champion_id) : ''}" onerror="this.style.opacity=.2">
+        <div class="md-mate-meta">
+          <div class="md-mate-name">${esc(m.name)}${isMe}</div>
+          <div class="md-mate-champ">${esc(m.champion_name || "?")}${hasPersona ? ` · <span class="md-mate-tag">已存画像</span>` : ""}</div>
+        </div>
+        <span class="md-mate-edit">✏️ 编辑</span>
+      </div>`;
+    }).join("");
+    detailEl.innerHTML = `<div class="md-detail-hint">点击任意队友编辑画像 (写入 data/profiles.json)</div>${rows}`;
+    const item = $(`.md-item[data-gid="${gid}"]`);
+    if(item) item.classList.add("expanded");
+  }catch(e){
+    detailEl.innerHTML = `<div class="md-detail-err">网络错误: ${esc(e.message)}</div>`;
+  }
+}
+
+const _HISTORY_MATES = {};                   // gid -> [mate, mate, ...]
+
 function bindMatchDrawer(){
   const drawer = $("#match-drawer");
   const handle = $("#md-handle");
+  const list   = $("#md-list");
   if(!drawer || !handle) return;
   // 默认折叠状态: 桌面打开, 移动端折叠 (高度有限)
   const collapsed = (localStorage.getItem("md_collapsed") === "1");
@@ -696,6 +745,21 @@ function bindMatchDrawer(){
     drawer.classList.toggle("collapsed");
     localStorage.setItem("md_collapsed",
       drawer.classList.contains("collapsed") ? "1" : "0");
+  });
+  // 抽屉里的点击事件: 历史 item 展开/折叠, 展开后的 mate 行 → 复用 openMateModal
+  list.addEventListener("click", e => {
+    const mate = e.target.closest(".md-mate");
+    if(mate){
+      const gid = mate.dataset.gid;
+      const idx = parseInt(mate.dataset.idx || "0", 10);
+      const m = (_HISTORY_MATES[gid] || [])[idx];
+      if(m) openMateModal(m);
+      return;
+    }
+    const item = e.target.closest(".md-item-history");
+    if(item && !item.classList.contains("no-detail")){
+      expandHistoryItem(item.dataset.gid);
+    }
   });
   // 30 秒自动刷新一次历史 (新对局 EOG 入库后能看到)
   setInterval(loadMatchHistory, 30000);

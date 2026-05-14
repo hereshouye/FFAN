@@ -322,6 +322,37 @@ body.recap-mode .card:hover{opacity:1}
 .md-item .md-result.unknown{color:var(--dim);background:rgba(255,255,255,.04)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
 
+/* 历史 item 可点击展开 → 队友列表 → 复用 openMateModal */
+.md-item-history{cursor:pointer;transition:background .15s}
+.md-item-history:hover{background:rgba(255,255,255,.04)}
+.md-item-history.expanded{background:rgba(122,160,255,.08);
+  border-left:2px solid var(--rb)}
+.md-item-history.no-detail{cursor:not-allowed;opacity:.55}
+.md-item-history.no-detail:hover{background:transparent}
+.md-no-detail{color:var(--dim);font-size:9px;padding:1px 5px;
+  background:rgba(255,255,255,.05);border-radius:3px;margin-left:4px}
+.md-detail{background:rgba(255,255,255,.02);
+  border-left:2px solid rgba(122,160,255,.4);
+  margin:0 4px 4px 14px;padding:6px 8px;border-radius:0 6px 6px 0;
+  display:flex;flex-direction:column;gap:3px}
+.md-detail-hint{font-size:10px;color:var(--dim);padding:2px 4px 4px;
+  border-bottom:1px dashed rgba(255,255,255,.06);margin-bottom:4px}
+.md-detail-loading,.md-detail-err{font-size:11px;color:var(--dim);padding:6px}
+.md-detail-err{color:var(--bad)}
+.md-mate{display:flex;align-items:center;gap:8px;padding:5px 6px;
+  border-radius:5px;cursor:pointer;font-size:11px;transition:background .12s}
+.md-mate:hover{background:rgba(72,209,209,.08)}
+.md-mate-ic{width:22px;height:22px;border-radius:4px;flex:none;
+  background:rgba(255,255,255,.05)}
+.md-mate-meta{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.md-mate-name{color:var(--txt);font-weight:600}
+.md-mate-champ{color:var(--dim);font-size:10px}
+.md-mate-tag{color:var(--ok);background:rgba(54,232,168,.08);padding:0 4px;
+  border-radius:3px;font-size:9px;margin-left:2px}
+.md-mate-edit{color:var(--teal);font-size:10px;flex:none;opacity:0;
+  transition:opacity .12s}
+.md-mate:hover .md-mate-edit{opacity:1}
+
 /* 给底部抽屉腾出空间, 防止 search 栏遮挡 */
 body{padding-bottom:300px}
 .contrib-tab{bottom:300px}

@@ -101,10 +101,19 @@ main{flex:1;padding:14px 16px 90px;max-width:980px;margin:0 auto;width:100%}
 .modal-current{background:#0a0817;border:1px solid var(--line);border-radius:6px;
   padding:8px 10px;font-size:12px;color:var(--txt);max-height:140px;
   overflow-y:auto;line-height:1.6}
-.modal-current .voice{color:var(--phi);white-space:pre-wrap;margin-bottom:6px}
-.modal-current .peer{color:var(--txt);padding-left:10px;position:relative}
+.modal-current .voice{color:var(--phi);white-space:pre-wrap;margin-bottom:6px;
+  position:relative;padding-right:22px}
+.modal-current .peer{color:var(--txt);padding-left:10px;padding-right:22px;
+  position:relative;margin-bottom:2px}
 .modal-current .peer::before{content:"·";position:absolute;left:0;color:var(--teal)}
 .modal-current .empty{color:var(--dim);font-style:italic}
+.modal-current .persona-del{position:absolute;right:0;top:0;background:transparent;
+  border:none;color:var(--dim);font-size:13px;cursor:pointer;
+  padding:0 4px;line-height:1.2;border-radius:3px;transition:all .12s}
+.modal-current .voice .persona-del{top:0}
+.modal-current .peer .persona-del{top:1px}
+.modal-current .persona-del:hover{color:var(--bad);
+  background:rgba(255,107,138,.12)}
 .modal textarea{width:100%;min-height:90px;background:var(--card2);
   border:1px solid var(--line);border-radius:6px;padding:9px 11px;
   color:var(--txt);font-size:13px;font-family:inherit;resize:vertical;outline:none}

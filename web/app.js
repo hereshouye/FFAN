@@ -489,21 +489,12 @@ function openMateModal(mate){
   _modal_mate  = mate;
   $("#modal-title").textContent = `${mate.name || '?'}  ·  ${mate.champion_name || '?'}`;
   $("#modal-sub").textContent   = `puuid: ${mate.puuid.slice(0,12)}…  ·  写入 data/profiles.json[persona]`;
-
-  // 渲染当前 persona
-  const p = (mate.profile||{}).persona || {};
-  const cur = $("#modal-current");
-  let html = "";
-  if(p.self_voice){
-    html += `<div class="voice"><b style="color:var(--gold)">TA 自己说:</b><br>${esc(p.self_voice)}</div>`;
-  }
-  if((p.peer_voices||[]).length){
-    html += `<div><b style="color:var(--teal)">别人说:</b></div>`;
-    for(const v of p.peer_voices){
-      html += `<div class="peer">${esc(v)}</div>`;
-    }
-  }
-  cur.innerHTML = html || `<div class="empty">暂无 persona, 添加第一条吧</div>`;
+  // 把当前 persona 同步到一个可变副本, 删除/添加后就在这上面操作
+  _modal_mate.profile = _modal_mate.profile || {};
+  _modal_mate.profile.persona = JSON.parse(JSON.stringify(
+    (mate.profile && mate.profile.persona) || {self_voice:"", peer_voices:[]}
+  ));
+  renderModalPersona();
 
   // 清空输入
   $("#modal-text").value = "";
@@ -511,6 +502,53 @@ function openMateModal(mate){
 
   $("#modal-bg").classList.add("on");
   setTimeout(() => $("#modal-text").focus(), 50);
+}
+
+function renderModalPersona(){
+  const p = (_modal_mate && _modal_mate.profile && _modal_mate.profile.persona) || {};
+  const cur = $("#modal-current");
+  let html = "";
+  if(p.self_voice){
+    html += `<div class="voice"><b style="color:var(--gold)">TA 自己说:</b>
+      <button class="persona-del" data-action="clear_self" title="清空自评">✕</button>
+      <br>${esc(p.self_voice)}</div>`;
+  }
+  if((p.peer_voices||[]).length){
+    html += `<div><b style="color:var(--teal)">别人说:</b></div>`;
+    (p.peer_voices||[]).forEach((v, idx) => {
+      html += `<div class="peer">
+        ${esc(v)}
+        <button class="persona-del" data-action="delete_peer" data-index="${idx}" title="删除这条">✕</button>
+      </div>`;
+    });
+  }
+  cur.innerHTML = html || `<div class="empty">暂无 persona, 添加第一条吧</div>`;
+}
+
+async function deletePersonaEntry(action, index){
+  if(!_modal_puuid) return;
+  const labelMap = {delete_peer: "删除这条 peer 评价?", clear_self: "清空 self_voice?"};
+  if(!confirm(labelMap[action] || "确认?")) return;
+  try{
+    const body = action === "delete_peer"
+      ? {puuid: _modal_puuid, action, index}
+      : {puuid: _modal_puuid, action};
+    const r = await fetch("/api/profile/persona", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    if(!j.ok){ alert("删除失败: " + (j.err || r.status)); return; }
+    // 用后端返回的最新数据刷新 modal
+    _modal_mate.profile.persona = {
+      self_voice:  j.self_voice  || "",
+      peer_voices: j.peer_voices || [],
+    };
+    renderModalPersona();
+  }catch(e){
+    alert("网络错误: " + e.message);
+  }
 }
 
 function closeMateModal(){
@@ -549,6 +587,15 @@ $("#modal-cancel").onclick = closeMateModal;
 $("#modal-save").onclick   = saveMatePersona;
 $("#modal-bg").addEventListener("click", e => {
   if(e.target.id === "modal-bg") closeMateModal();
+});
+// 模态框内删除按钮 (✕ on self_voice / 每条 peer_voice)
+$("#modal-current").addEventListener("click", e => {
+  const btn = e.target.closest(".persona-del");
+  if(!btn) return;
+  e.stopPropagation();
+  const action = btn.dataset.action;
+  const index  = parseInt(btn.dataset.index || "0", 10);
+  deletePersonaEntry(action, index);
 });
 document.addEventListener("keydown", e => {
   if(!$("#modal-bg").classList.contains("on")) return;

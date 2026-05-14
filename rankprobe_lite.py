@@ -2717,35 +2717,57 @@ class Handler(BaseHTTPRequestHandler):
     def _post_persona(self):
         """更新一个 puuid 的 persona.
 
-        Body JSON: {"puuid": str, "kind": "self"|"peer", "text": str,
-                    "replace_peers": bool}
-          - kind=self    : 覆盖 persona.self_voice
-          - kind=peer    : 追加到 persona.peer_voices (replace_peers=true 则替换最后一条)
+        Body JSON 支持两种 action:
+          {"puuid": str, "kind": "self"|"peer", "text": str}            ← 默认: add
+              kind=self: 覆盖 persona.self_voice
+              kind=peer: 追加到 persona.peer_voices
+
+          {"puuid": str, "action": "delete_peer", "index": int}         ← 删除某条
+          {"puuid": str, "action": "clear_self"}                        ← 清空 self_voice
         """
         try:
             length = int(self.headers.get("Content-Length", "0"))
             body = json.loads(self.rfile.read(length) or b"{}")
         except Exception as e:
             self._send(400, {"err": f"bad json: {e}"}); return
-        puuid = (body.get("puuid") or "").strip()
-        kind  = (body.get("kind") or "").strip()
-        text  = (body.get("text") or "").strip()
-        if not puuid or kind not in ("self", "peer") or not text:
-            self._send(400, {"err": "需要 puuid + kind(self|peer) + text"}); return
+        puuid  = (body.get("puuid") or "").strip()
+        action = (body.get("action") or "add").strip().lower()
+        if not puuid:
+            self._send(400, {"err": "需要 puuid"}); return
 
         full = _load_full_profiles()
         if full is None:
             self._send(500, {"err": "profiles.json 读取失败"}); return
         prof = full.get(puuid)
         if not isinstance(prof, dict):
-            # 自动建一条最小 profile
-            prof = dict(PROFILE_DEFAULTS)
-            full[puuid] = prof
+            prof = dict(PROFILE_DEFAULTS); full[puuid] = prof
         persona = _ensure_persona(prof)
-        if kind == "self":
-            persona["self_voice"] = text
-        else:
-            persona["peer_voices"].append(text)
+
+        if action == "delete_peer":
+            try: idx = int(body.get("index"))
+            except (TypeError, ValueError):
+                self._send(400, {"err": "index 必须是整数"}); return
+            voices = persona.get("peer_voices") or []
+            if idx < 0 or idx >= len(voices):
+                self._send(400, {"err": f"index 越界 (peer_voices 长 {len(voices)})"}); return
+            removed = voices.pop(idx)
+            persona["peer_voices"] = voices
+            log_tag = f"删 peer[{idx}]={removed[:20]}"
+        elif action == "clear_self":
+            persona["self_voice"] = ""
+            log_tag = "清 self_voice"
+        else:  # add
+            kind = (body.get("kind") or "").strip()
+            text = (body.get("text") or "").strip()
+            if kind not in ("self", "peer") or not text:
+                self._send(400, {"err": "add: 需要 kind(self|peer) + 非空 text"}); return
+            if kind == "self":
+                persona["self_voice"] = text
+                log_tag = "覆盖 self_voice"
+            else:
+                persona["peer_voices"].append(text)
+                log_tag = f"加 peer (共 {len(persona['peer_voices'])} 条)"
+
         persona["updated_at"] = dt.datetime.now().isoformat(timespec="seconds")
         try:
             _save_full_profiles(full)
@@ -2754,15 +2776,18 @@ class Handler(BaseHTTPRequestHandler):
 
         # 热重载内存并广播 state
         load_profiles()
-        # demo 模式下重建 STATE
         if _IS_DEMO:
             try: load_demo_state()
             except Exception: pass
         _broadcast("state", json.dumps(_state_snapshot(), ensure_ascii=False))
-        push_log(f"[persona] {kind} 已更新 → {prof.get('nickname','?')} ({puuid[:8]})")
-        self._send(200, {"ok": True, "kind": kind,
-                         "self_voice": persona["self_voice"],
-                         "peer_count": len(persona["peer_voices"])})
+        push_log(f"[persona] {log_tag} → {prof.get('nickname','?')} ({puuid[:8]})")
+        self._send(200, {
+            "ok":          True,
+            "action":      action,
+            "self_voice":  persona.get("self_voice") or "",
+            "peer_voices": list(persona.get("peer_voices") or []),
+            "peer_count":  len(persona.get("peer_voices") or []),
+        })
 
     # ---- helpers ----
     def _serve_static(self, filename, content_type):
